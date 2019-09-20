@@ -16,7 +16,7 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 #include "ActivityInfoTree.h"
 #include "ApplicationInfo.h"
@@ -30,9 +30,9 @@
 #include <QTextStream>
 
 ActivityInfoTree::ActivityInfoTree(QObject *parent) : QObject(parent),
-	m_currentActivity(NULL)
-{}
-
+       m_rootMenu(nullptr), m_currentActivity(nullptr)
+{
+}
 
 void ActivityInfoTree::setRootMenu(ActivityInfo *rootMenu)
 {
@@ -46,25 +46,25 @@ ActivityInfo *ActivityInfoTree::getRootMenu() const
 
 QQmlListProperty<ActivityInfo> ActivityInfoTree::menuTree()
 {
-    return QQmlListProperty<ActivityInfo>(this, NULL, &menuTreeCount, &menuTreeAt);
+    return {this, nullptr, &menuTreeCount, &menuTreeAt};
 }
 
 int ActivityInfoTree::menuTreeCount(QQmlListProperty<ActivityInfo> *property)
 {
     ActivityInfoTree *obj = qobject_cast<ActivityInfoTree*>(property->object);
-    if(obj)
+    if(obj != nullptr)
         return obj->m_menuTree.count();
-    else
-        return 0;
+
+    return 0;
 }
 
 ActivityInfo *ActivityInfoTree::menuTreeAt(QQmlListProperty<ActivityInfo> *property, int index)
 {
     ActivityInfoTree *obj = qobject_cast<ActivityInfoTree*>(property->object);
-    if(obj)
+    if(obj != nullptr)
         return obj->m_menuTree.at(index);
-    else
-        return 0;
+
+    return nullptr;
 }
 
 ActivityInfo *ActivityInfoTree::menuTree(int index) const
@@ -81,20 +81,6 @@ void ActivityInfoTree::setCurrentActivity(ActivityInfo *currentActivity)
 ActivityInfo *ActivityInfoTree::getCurrentActivity() const
 {
     return m_currentActivity;
-}
-
-ActivityInfo *ActivityInfoTree::getParentActivity(ActivityInfo *root, ActivityInfo *menu)
-{
-    qDebug() << "Parent Path= " << menu->getSectionPath();
-
-    Q_FOREACH( QObject *object, root->children() )
-	{
-            ActivityInfo *activityInfo = qobject_cast<ActivityInfo*>(object);
-            if(activityInfo->section() == menu->section()) {
-                return activityInfo;
-            }
-	}
-    return m_menuTree.at(0);
 }
 
 void ActivityInfoTree::menuTreeAppend(ActivityInfo *menu)
@@ -117,28 +103,34 @@ void ActivityInfoTree::menuTreeAppend(QQmlEngine *engine,
     }
 }
 
-void ActivityInfoTree::sortByDifficulty()
+void ActivityInfoTree::sortByDifficulty(bool emitChanged)
 {
-    qSort(m_menuTree.begin(), m_menuTree.end(), SortByDifficulty());
-    emit menuTreeChanged();
+    std::sort(m_menuTree.begin(), m_menuTree.end(), SortByDifficulty());
+    if (emitChanged)
+        Q_EMIT menuTreeChanged();
 }
 
-void ActivityInfoTree::sortByName()
+void ActivityInfoTree::sortByName(bool emitChanged)
 {
-    qSort(m_menuTree.begin(), m_menuTree.end(), SortByName());
-    emit menuTreeChanged();
+    std::sort(m_menuTree.begin(), m_menuTree.end(), SortByName());
+    if (emitChanged)
+        Q_EMIT menuTreeChanged();
 }
 
 // Filter the current activity list by the given tag
 // the tag 'all' means no filter
 // the tag 'favorite' means only marked as favorite
 // The level is also filtered based on the global property
-void ActivityInfoTree::filterByTag(const QString &tag)
+void ActivityInfoTree::filterByTag(const QString &tag, const QString &category, bool emitChanged)
 {
     m_menuTree.clear();
-    for(auto activity: m_menuTreeFull) {
-        if((activity->section().indexOf(tag) != -1 ||
-			tag == "all" ||
+    // https://www.kdab.com/goodbye-q_foreach/, for loops on QList may cause detach
+    const auto constMenuTreeFull = m_menuTreeFull;
+    for(const auto &activity: constMenuTreeFull) {
+        // filter on category if given else on tag
+        if(((!category.isEmpty() && activity->section().indexOf(category) != -1) ||
+            (category.isEmpty() && activity->section().indexOf(tag) != -1) ||
+            tag == "all" ||
             (tag == "favorite" && activity->favorite())) &&
             (activity->difficulty() >= ApplicationSettings::getInstance()->filterLevelMin() &&
              activity->difficulty() <= ApplicationSettings::getInstance()->filterLevelMax())) {
@@ -146,10 +138,20 @@ void ActivityInfoTree::filterByTag(const QString &tag)
         }
     }
     sortByDifficulty();
-    emit menuTreeChanged();
+    if (emitChanged)
+        Q_EMIT menuTreeChanged();
 }
 
-void ActivityInfoTree::filterLockedActivities()
+void ActivityInfoTree::filterByDifficulty(quint32 levelMin, quint32 levelMax)
+{
+    auto it = std::remove_if(m_menuTree.begin(), m_menuTree.end(),
+                             [&](const ActivityInfo* activity) {
+                                 return activity->difficulty() < levelMin || activity->difficulty() > levelMax;
+                             });
+    m_menuTree.erase(it, m_menuTree.end());
+}
+
+void ActivityInfoTree::filterLockedActivities(bool emitChanged)
 {
     // If we have the full version or if we show all the activities, we don't need to do anything
     if(!ApplicationSettings::getInstance()->isDemoMode() || ApplicationSettings::getInstance()->showLockedActivities())
@@ -159,27 +161,32 @@ void ActivityInfoTree::filterLockedActivities()
     auto it = std::remove_if(m_menuTree.begin(), m_menuTree.end(),
                              [](const ActivityInfo* activity) { return !activity->demo(); });
     m_menuTree.erase(it, m_menuTree.end());
-    emit menuTreeChanged();
+    if (emitChanged)
+        Q_EMIT menuTreeChanged();
 }
 
-void ActivityInfoTree::filterEnabledActivities()
+void ActivityInfoTree::filterEnabledActivities(bool emitChanged)
 {
     auto it = std::remove_if(m_menuTree.begin(), m_menuTree.end(),
                              [](const ActivityInfo* activity) { return !activity->enabled(); });
     m_menuTree.erase(it, m_menuTree.end());
-    emit menuTreeChanged();
+    if (emitChanged)
+        Q_EMIT menuTreeChanged();
 }
 
-void ActivityInfoTree::filterCreatedWithinVersions(int firstVersion, int lastVersion)
+void ActivityInfoTree::filterCreatedWithinVersions(int firstVersion,
+                                                   int lastVersion,
+                                                   bool emitChanged)
 {
     m_menuTree.clear();
-    for(auto activity: m_menuTreeFull) {
+    const auto constMenuTreeFull = m_menuTreeFull;
+    for(const auto &activity: constMenuTreeFull) {
         if(firstVersion < activity->createdInVersion() && activity->createdInVersion() <= lastVersion) {
             m_menuTree.push_back(activity);
         }
     }
-
-    emit menuTreeChanged();
+    if (emitChanged)
+        Q_EMIT menuTreeChanged();
 }
 
 void ActivityInfoTree::exportAsSQL()
@@ -207,7 +214,8 @@ void ActivityInfoTree::exportAsSQL()
     cout << "DELETE FROM activities" << endl;
 
     int i(0);
-    for(auto activity: m_menuTree) {
+    const auto constMenuTree = m_menuTree;
+    for(const auto &activity: constMenuTree) {
         cout << "INSERT INTO activities VALUES(" <<
                 i++ << ", " <<
                 "'" << activity->name() << "', " <<
@@ -221,7 +229,7 @@ void ActivityInfoTree::exportAsSQL()
                 "\"" << activity->goal().toHtmlEscaped() << "\", " <<
                 "\"" << activity->manual().toHtmlEscaped() << "\", " <<
                 "\"" << activity->credit() << "\", " <<
-                activity->demo() <<
+                static_cast<int>(activity->demo()) <<
                 ");" << endl;
     }
 }
@@ -230,7 +238,7 @@ QObject *ActivityInfoTree::menuTreeProvider(QQmlEngine *engine, QJSEngine *scrip
 {
     Q_UNUSED(scriptEngine)
 
-    ActivityInfoTree *menuTree = new ActivityInfoTree(NULL);
+    ActivityInfoTree *menuTree = new ActivityInfoTree(nullptr);
     QQmlComponent componentRoot(engine,
                                 QUrl("qrc:/gcompris/src/activities/menu/ActivityInfo.qml"));
     QObject *objectRoot = componentRoot.create();
@@ -251,7 +259,7 @@ QObject *ActivityInfoTree::menuTreeProvider(QQmlEngine *engine, QJSEngine *scrip
 
             QQmlComponent componentRoot(engine, QUrl(url));
             QObject *objectRoot = componentRoot.create();
-            if(objectRoot) {
+            if(objectRoot != nullptr) {
                 menuTree->menuTreeAppend(qobject_cast<ActivityInfo*>(objectRoot));
             } else {
                 qDebug() << "ERROR: failed to load " << line << " " << componentRoot.errors();
@@ -266,7 +274,7 @@ QObject *ActivityInfoTree::menuTreeProvider(QQmlEngine *engine, QJSEngine *scrip
     return menuTree;
 }
 
-void ActivityInfoTree::init()
+void ActivityInfoTree::registerResources()
 {
     if(!QResource::registerResource(ApplicationInfo::getFilePath("core.rcc")))
         qDebug() << "Failed to load the resource file " << ApplicationInfo::getFilePath("core.rcc");
@@ -277,11 +285,58 @@ void ActivityInfoTree::init()
     if(!QResource::registerResource(ApplicationInfo::getFilePath("activities.rcc")))
         qDebug() << "Failed to load the resource file activities.rcc";
 
-    if(QResource::registerResource(QStandardPaths::writableLocation(QStandardPaths::DataLocation) +
+    if(QResource::registerResource(ApplicationSettings::getInstance()->cachePath() +
                                    "/data2/" + QString("full-%1.rcc").arg(COMPRESSED_AUDIO)))
         qDebug() << "Registered the pre-download " << QString("full-%1.rcc").arg(COMPRESSED_AUDIO);
+}
 
-    qmlRegisterSingletonType<QObject>("GCompris", 1, 0, "ActivityInfoTree", menuTreeProvider);
-    qmlRegisterType<ActivityInfo>("GCompris", 1, 0, "ActivityInfo");
+void ActivityInfoTree::filterBySearch(const QString& text)
+{
+    m_menuTree.clear();
+    if(!text.trimmed().isEmpty()) {
+        // perform search on each word entered in the searchField
+        const QStringList wordsList = text.split(' ', QString::SkipEmptyParts);
+        for(const QString &searchTerm: wordsList) {
+            const QString trimmedText = searchTerm.trimmed();
+            const auto &constMenuTreeFull = m_menuTreeFull;
+            for(const auto &activity: constMenuTreeFull) {
+                if(activity->title().contains(trimmedText, Qt::CaseInsensitive) ||
+                    activity->name().contains(trimmedText, Qt::CaseInsensitive) ||
+                    activity->description().contains(trimmedText, Qt::CaseInsensitive)) {
+
+                    // add the activity only if it's not added
+                    if(m_menuTree.indexOf(activity) == -1)
+                        m_menuTree.push_back(activity);
+                }
+            }
+        }
+    }
+    else
+        m_menuTree = m_menuTreeFull;
+
+    filterEnabledActivities(false);
+    filterLockedActivities(false);
+    filterByDifficulty(ApplicationSettings::getInstance()->filterLevelMin(), ApplicationSettings::getInstance()->filterLevelMax());
+    sortByDifficulty(false);
+    Q_EMIT menuTreeChanged();
+}
+
+QVariantList ActivityInfoTree::allCharacters() {
+    QSet<QChar> keyboardChars;
+    const auto constMenuTreeFull = m_menuTreeFull;
+    for(const auto &tree: constMenuTreeFull) {
+        const QString &title = tree->title();
+        for(const QChar &letter: title) {
+            if(!letter.isSpace() && !letter.isPunct()) {
+                keyboardChars.insert(letter.toLower());
+            }
+        }
+    }
+    for(const QChar &letters: keyboardChars) {
+        m_keyboardCharacters.push_back(letters);
+    }
+    std::sort(m_keyboardCharacters.begin(), m_keyboardCharacters.end());
+
+    return m_keyboardCharacters;
 }
 

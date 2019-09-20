@@ -17,10 +17,10 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 .pragma library
-.import QtQuick 2.0 as Quick
+.import QtQuick 2.6 as Quick
 
 var currentLevel = 0
 var numberOfLevel = 9
@@ -41,26 +41,27 @@ function initLevel() {
     items.bar.level = currentLevel + 1
     if(currentLevel === 0) items.duration = 1000
     else if(currentLevel === 1) items.duration = 800
-    else if(currentLevel === 2) items.duration = 600
-    else if(currentLevel === 3) items.duration = 400
-    else if(currentLevel === 4) items.duration = 250
-    else if(currentLevel === 5) items.duration = 200
-    else if(currentLevel === 6) items.duration = 180
-    else if(currentLevel === 7) items.duration = 170
-    else if(currentLevel === 8) items.duration = 160
+    else if(currentLevel === 2) items.duration = 700
+    else if(currentLevel === 3) items.duration = 600
+    else if(currentLevel === 4) items.duration = 500
+    else if(currentLevel === 5) items.duration = 400
+    else if(currentLevel === 6) items.duration = 350
+    else if(currentLevel === 7) items.duration = 300
+    else if(currentLevel === 8) items.duration = 250
 
     resetLevel()
 }
 
 function resetLevel() {
     items.ball.state = "INITIAL"
+    items.saveBallState = "INITIAL"
     items.progressRight.ratio = 0
     items.progressLeft.ratio = 0
     items.progressTop.ratio = 0
 }
 
 function nextLevel() {
-    if(numberOfLevel <= ++currentLevel ) {
+    if(numberOfLevel <= ++currentLevel) {
         currentLevel = 0
     }
     initLevel();

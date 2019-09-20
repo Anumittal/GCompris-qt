@@ -1,10 +1,11 @@
-if(SAILFISHOS)
-  cmake_minimum_required(VERSION 2.8.11)
-else(SAILfISHOS)
-  cmake_minimum_required(VERSION 2.8.12)
-endif()
+cmake_minimum_required(VERSION 2.8.12)
+cmake_policy(SET CMP0043 NEW)
 
 project(gcompris-qt C CXX)
+
+# get all the redist dll needed for windows when compiling with vc
+set(CMAKE_INSTALL_UCRT_LIBRARIES 1)
+include(InstallRequiredSystemLibraries)
 
 # Set c++11 support
 include(CheckCXXCompilerFlag)
@@ -25,11 +26,11 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${my_cxx_flags}")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DQT_QML_DEBUG")
 
 set(GCOMPRIS_MAJOR_VERSION 0)
-set(GCOMPRIS_MINOR_VERSION 60)
+set(GCOMPRIS_MINOR_VERSION 98)
 set(GCOMPRIS_PATCH_VERSION 0)
 
 # Set the BUILD_DATE
-string(TIMESTAMP BUILD_DATE %Y%M)
+string(TIMESTAMP BUILD_DATE %Y%m)
 
 # cmake modules setup
 find_package(ECM 1.4.0 QUIET NO_MODULE)
@@ -38,17 +39,34 @@ set(CMAKE_PREFIX_PATH "${Qt5_DIR}/lib/cmake/Qt5")
 
 # KDE po to qm tools
 if(ECM_FOUND)
+  include(kdeFetchTranslation)
+  include(ECMAddTests)
   include(ECMPoQmTools)
   if (IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/po")
     ecm_install_po_files_as_qm(po)
   endif()
+
+  option(BUILD_TESTING "Build and enable unit tests" OFF)
+  include(ECMCoverageOption)
 endif(ECM_FOUND)
+
+# add tools (cppcheck, clang-tidy...) if build on testing mode only
+# (slower compilation)
+if(BUILD_TESTING)
+  include(CodeQualityUtils)
+endif()
+
+set(QT_REQUIRED_VERSION 5.6.0)
 
 if(CMAKE_SYSTEM_NAME STREQUAL Android)
   find_package(ECM)
   set(ANDROID 1)
   # TODO: possibly should be setup by toolchain one day
   set(QT_QMAKE_EXECUTABLE "${_qt5Core_install_prefix}/bin/qmake")
+  if(ECM_VERSION VERSION_GREATER "5.55.0")
+    set(QT_REQUIRED_VERSION 5.12.0)
+  endif()
+
   # workaround until this fix is in released ECM
   if(ECM_VERSION VERSION_LESS "5.15.0")
     add_definitions(-DANDROID)
@@ -58,13 +76,10 @@ endif()
 # Set executable filename
 if(ANDROID)
   set(GCOMPRIS_EXECUTABLE_NAME GCompris)
-  if("${ANDROID_ARCHITECTURE}" STREQUAL "x86")
-    # We always want x86 to be a release above to arm one because the play
-    # store want x86 to be pushed after arm.
-    MATH(EXPR GCOMPRIS_MINOR_VERSION "${GCOMPRIS_MINOR_VERSION}+1")
-  endif("${ANDROID_ARCHITECTURE}" STREQUAL "x86")
 elseif(SAILFISHOS)
   set(GCOMPRIS_EXECUTABLE_NAME harbour-gcompris-qt)
+elseif(WIN32)
+  set(GCOMPRIS_EXECUTABLE_NAME GCompris)
 else()
   set(GCOMPRIS_EXECUTABLE_NAME gcompris-qt)
 endif()
@@ -75,14 +90,6 @@ set(GCOMPRIS_VERSION ${GCOMPRIS_MAJOR_VERSION}.${GCOMPRIS_MINOR_VERSION})
 # Increase it at each release
 math(EXPR GCOMPRIS_VERSION_CODE "${GCOMPRIS_MAJOR_VERSION}*10000 + ${GCOMPRIS_MINOR_VERSION}*100 + ${GCOMPRIS_PATCH_VERSION}")
 
-# KDE po to qm tools
-if(ECM_FOUND)
-  include(ECMPoQmTools)
-  if (IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/po")
-    ecm_install_po_files_as_qm(po)
-  endif()
-endif(ECM_FOUND)
-
 # prevent build in source directory
 if("${CMAKE_BINARY_DIR}" STREQUAL "${CMAKE_SOURCE_DIR}")
     message(SEND_ERROR "Building in the source directory is not supported.")
@@ -90,37 +97,47 @@ if("${CMAKE_BINARY_DIR}" STREQUAL "${CMAKE_SOURCE_DIR}")
             directory and create a build directory and call \"${CMAKE_COMMAND} <path to the sources>\".")
 endif("${CMAKE_BINARY_DIR}" STREQUAL "${CMAKE_SOURCE_DIR}")
 
-# Sailfish does not provide a recent Qt version
-if(SAILFISHOS)
-  set(QT_REQUIRED_VERSION 5.2.2)
-else()
-  set(QT_REQUIRED_VERSION 5.3.0)
-endif()
-
 find_package(Qt5 ${QT_REQUIRED_VERSION} REQUIRED
-            Qml Quick Gui Multimedia Core Svg Xml XmlPatterns LinguistTools Sensors)
+    Qml Quick Gui Multimedia Core Svg Xml XmlPatterns LinguistTools Sensors)
+
+if(ANDROID)
+    find_package(Qt5 ${QT_REQUIRED_VERSION} REQUIRED AndroidExtras)
+endif(ANDROID)
+
+if(SAILFISHOS)
+    find_package(Qt5 ${QT_REQUIRED_VERSION} REQUIRED Widgets)
+endif(SAILFISHOS)
+
+## For now we workaround CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION to clang with a command variable, so not needed
+# if(ANDROID AND ECM_VERSION VERSION_LESS "5.56.0" AND Qt5Core_VERSION VERSION_GREATER "5.11.99")
+#   message(FATAL_ERROR "ECM ${ECM_VERSION} not compatible with Qt ${Qt5Core_VERSION} version for android.")
+# endif()
+
+if((UNIX AND NOT APPLE AND NOT SAILFISHOS AND NOT ANDROID) OR WIN32)
+    find_package(OpenSSL REQUIRED)
+endif()
 
 find_package (KF5 QUIET COMPONENTS
     DocTools
 )
-if(KF5_FOUND)
+if(ECM_FOUND)
     include(KDEInstallDirs)
-endif(KF5_FOUND)
 
-FIND_PROGRAM(LCONVERT_EXECUTABLE lconvert lconvert-qt5
-  PATHS
-  ${Qt5_DIR}/../../../bin/
-  /usr/local/bin
-  /usr/bin/
-  NO_DEFAULT_PATH
-)
-FIND_PROGRAM(LRELEASE_EXECUTABLE lrelease lrelease-qt5
-  PATHS
-  ${Qt5_DIR}/../../../bin/
-  /usr/local/bin
-  /usr/bin/
-  NO_DEFAULT_PATH
-)
+    if(ECM_VERSION VERSION_GREATER "1.6.0")
+        add_subdirectory(images)
+        install(FILES org.kde.gcompris.appdata.xml DESTINATION ${KDE_INSTALL_METAINFODIR})
+        install(FILES org.kde.gcompris.desktop DESTINATION ${KDE_INSTALL_APPDIR})
+    else()
+        message(STATUS "ECM_VERSION is ${ECM_VERSION}, icons and desktop files won't be installed.")
+    endif()
+endif()
+
+# Tell CMake to run moc when necessary:
+set(CMAKE_AUTOMOC ON)
+
+# As moc files are generated in the binary dir, tell CMake
+# to always look for includes there:
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 #get_cmake_property(_variableNames VARIABLES)
 #foreach (_variableName ${_variableNames})
@@ -131,17 +148,17 @@ set(ACTIVATION_MODE "no" CACHE STRING "Policy for activation [no|inapp|internal]
 option(WITH_DEMO_ONLY "Include only demo activities" OFF)
 
 option(WITH_DOWNLOAD "Internal download" ON)
-if(WITH_DOWNLOAD)
-  set(ANDROID_INTERNET_PERMISSION "<uses-permission android:name=\"android.permission.INTERNET\" />")
-  set(ANDROID_ACCESS_NETWORK_STATE_PERMISSION "<uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\" />")
-endif(WITH_DOWNLOAD)
+# @FIXME These permissions should be removed if download is disable
+#        but it makes the application crash on exit (tested on Android 6)
+set(ANDROID_INTERNET_PERMISSION "<uses-permission android:name=\"android.permission.INTERNET\" />")
+set(ANDROID_ACCESS_NETWORK_STATE_PERMISSION "<uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\" />")
+
+set(GRAPHICAL_RENDERER "auto" CACHE STRING "Policy for choosing the renderer backend [opengl|software|auto]")
 
 # Set output directory
 if(CMAKE_HOST_APPLE)
   set(_bundle_bin gcompris-qt.app/Contents/MacOS)
   set(_data_dest_dir bin/${_bundle_bin}/../Resources)
-elseif(ANDROID)
-  set(_data_dest_dir android/assets)
 else()
   set(_data_dest_dir share/${GCOMPRIS_EXECUTABLE_NAME})
 endif()
@@ -149,7 +166,7 @@ if(ANDROID)
   # Android .so output
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/android/libs/${ANDROID_ABI}/)
   set(GCOMPRIS_TRANSLATIONS_DIR ${CMAKE_BINARY_DIR}/${_data_dest_dir} CACHE INTERNAL "" FORCE)
-  set(GCOMPRIS_RCC_DIR ${CMAKE_BINARY_DIR}/${_data_dest_dir} CACHE INTERNAL "" FORCE)
+  set(GCOMPRIS_RCC_DIR ${CMAKE_BINARY_DIR}/android/assets/${_data_dest_dir}/rcc CACHE INTERNAL "" FORCE)
   if(ACTIVATION_MODE STREQUAL "inapp")
     set(ANDROID_BILLING_PERMISSION "<uses-permission android:name=\"com.android.vending.BILLING\"/>")
     set(ANDROID_PACKAGE "net.gcompris")
@@ -196,7 +213,7 @@ add_custom_target(getSvnTranslations
   COMMENT "Re-run cmake after this to be able to run BuildTranslations with the latest files"
   )
 
-# Get all po files in po/. You can get them doing : python2 tools/l10n-fetch-po-files.py
+# Get all po files in po/. You can get them doing: python2 tools/l10n-fetch-po-files.py
 file(GLOB TRANSLATIONS_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "po/*.po")
 # Set the output dir for the translation files to /bin
 foreach(PoSource ${TRANSLATIONS_FILES})
@@ -215,21 +232,57 @@ foreach(PoSource ${TRANSLATIONS_FILES})
     # Remove the obsolete translations and set po in the ts output file
     COMMAND msgattrib --no-obsolete  ${CMAKE_CURRENT_SOURCE_DIR}/${PoSource} -o ${OutTsFile}
     # Convert the po into ts
-    COMMAND ${LCONVERT_EXECUTABLE} -if po -of ts -i ${OutTsFile} -o ${OutTsFile}
+    COMMAND Qt5::lconvert -if po -of ts -i ${OutTsFile} -o ${OutTsFile}
     # Convert the ts in qm removing non finished translations
-    COMMAND ${LRELEASE_EXECUTABLE} -compress -nounfinished ${OutTsFile} -qm ${GCOMPRIS_TRANSLATIONS_DIR}/${QmOutput}
+    COMMAND Qt5::lrelease -compress -nounfinished ${OutTsFile} -qm ${GCOMPRIS_TRANSLATIONS_DIR}/${QmOutput}
     )
   list(APPEND QM_FILES ${QmOutput})
 endforeach()
 
 # Install translations
-add_custom_target(BuildTranslations
-  DEPENDS ${QM_FILES}
-  COMMENT "If you don't have the .po, you need to run make getSvnTranslations first then re-run cmake"
+if (WIN32)
+    add_custom_target(BuildTranslations
+        DEPENDS ${QM_FILES}
+        COMMENT "If you don't have the .po, you need to run make getSvnTranslations first then re-run cmake"
+    )
+else()
+    add_custom_target(BuildTranslations ALL
+        DEPENDS ${QM_FILES}
+        COMMENT "If you don't have the .po, you need to run make getSvnTranslations first then re-run cmake"
+    )
+endif()
+
+add_custom_command(
+    OUTPUT doBundleTranslations
+    COMMAND 7z a -w${CMAKE_BINARY_DIR}/share/${GCOMPRIS_EXECUTABLE_NAME}
+               ${CMAKE_BINARY_DIR}/translations-${GCOMPRIS_VERSION}.7z
+               ${CMAKE_BINARY_DIR}/share/${GCOMPRIS_EXECUTABLE_NAME}/translations
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
+# Bundle translations
+add_custom_target(BundleTranslations
+  DEPENDS doBundleTranslations
+  COMMENT "If you want to provide a zip of the translations on a server (run make BuildTranslations first)"
+  )
+
+add_custom_command(
+    OUTPUT doDlAndInstallBundledTranslations
+    COMMAND curl -fsS -o translations-${GCOMPRIS_VERSION}.7z
+                 http://gcompris.net/download/translations-${GCOMPRIS_VERSION}.7z
+    COMMAND 7z x -y -o${CMAKE_BINARY_DIR}/share/${GCOMPRIS_EXECUTABLE_NAME}
+               translations-${GCOMPRIS_VERSION}.7z
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+# Download and install bundled translations
+add_custom_target(DlAndInstallBundledTranslations
+  DEPENDS doDlAndInstallBundledTranslations
+  COMMENT "Download the bundled translation and install them in the build dir"
   )
 
 if(CMAKE_HOST_APPLE)
   install(DIRECTORY ${GCOMPRIS_TRANSLATIONS_DIR} DESTINATION ${_bundle_bin})
+elseif(ANDROID)
+  install(DIRECTORY ${GCOMPRIS_TRANSLATIONS_DIR} DESTINATION "share")
 else()
   install(DIRECTORY ${GCOMPRIS_TRANSLATIONS_DIR} DESTINATION ${_data_dest_dir})
 endif()
@@ -273,7 +326,7 @@ foreach(OGG_FILE ${OGG_FILES})
     OUTPUT ${MP3_FILE}
     # Put the good line depending on your installation
     #COMMAND avconv -v warning -i ${OGG_FILE} -acodec mp3 ${MP3_FILE}
-    COMMAND ffmpeg -v warning -i ${OGG_FILE} -acodec mp3 -strict -2 ${AAC_FILE}
+    COMMAND ffmpeg -v warning -i ${OGG_FILE} -acodec mp3 -strict -2 ${MP3_FILE}
     )
   list(APPEND MP3_FILES ${MP3_FILE})
 endforeach()
@@ -288,6 +341,51 @@ add_custom_target(
   DEPENDS ${MP3_FILES}
   )
 
+# predownload assets (voices and images) and install them in the rcc folder
+set(DOWNLOAD_ASSETS "" CACHE STRING "Download and packages images and voices. use a list like: words,en,fr,pt_BR to retrieve multiple files")
+add_custom_command(
+    OUTPUT predownloadAssets
+    COMMAND python tools/download-assets.py ${DOWNLOAD_ASSETS} ${COMPRESSED_AUDIO} ${GCOMPRIS_RCC_DIR}
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
+
+add_custom_command(
+  OUTPUT assetsFolders
+  COMMAND cmake -E make_directory "${GCOMPRIS_RCC_DIR}/data2"
+  COMMAND cmake -E make_directory "${GCOMPRIS_RCC_DIR}/data2/voices-${COMPRESSED_AUDIO}"
+  COMMAND cmake -E make_directory "${GCOMPRIS_RCC_DIR}/data2/words"
+  )
+# Install assets
+add_custom_target(getAssets
+  DEPENDS assetsFolders predownloadAssets
+  )
+
+add_custom_command(
+    OUTPUT doBundleConvertedOggs
+    COMMAND 7z a converted_ogg_to_${COMPRESSED_AUDIO}-${GCOMPRIS_VERSION}.7z '-ir!src/*${COMPRESSED_AUDIO}'
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
+# Bundle oggs ready to be uploaded on a server. This ease build on system without the appropriate audio
+# convertion tools.
+add_custom_target(BundleConvertedOggs
+  DEPENDS doBundleConvertedOggs
+  COMMENT "Bundle the converted oggs to upload them on a server. First set COMPRESSED_AUDIO appropriately."
+  )
+
+add_custom_command(
+    OUTPUT doDlAndInstallBundledConvertedOggs
+    COMMAND curl -fsS -o converted_ogg_to_${COMPRESSED_AUDIO}-${GCOMPRIS_VERSION}.7z
+            http://gcompris.net/download/converted_ogg_to_${COMPRESSED_AUDIO}-${GCOMPRIS_VERSION}.7z
+    COMMAND 7z x -y converted_ogg_to_${COMPRESSED_AUDIO}-${GCOMPRIS_VERSION}.7z
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
+# Download and install bundled converted oggs
+add_custom_target(DlAndInstallBundledConvertedOggs
+  DEPENDS doDlAndInstallBundledConvertedOggs
+  COMMENT "Download the bundled converted oggs and install them in the source dir"
+  )
+
+
 set(ARCHIVE_NAME ${CMAKE_PROJECT_NAME}-${GCOMPRIS_VERSION})
 add_custom_target(dist
     COMMAND git archive --prefix=${ARCHIVE_NAME}/ HEAD
@@ -298,89 +396,21 @@ if(KF5_FOUND)
     add_subdirectory(docs/docbook)
 endif(KF5_FOUND)
 
+# qml-box2d
+include(cmake/box2d.cmake)
+
+add_subdirectory(src)
+
 if(SAILFISHOS)
   # Need to be done at the end, after src
   add_subdirectory(platforms/sailfishOS)
 endif()
 
-#
-# qml-box2d
-#
+# only enable unit tests for linux
+if(BUILD_TESTING)
+  enable_testing()
+  add_subdirectory(tests)
+endif(BUILD_TESTING)
 
-set(QML_BOX2D_MODULE "auto" CACHE STRING "Policy for qml-box2d module [auto|submodule|system|disabled]")
-
-if (${QML_BOX2D_MODULE} STREQUAL "disabled")
-  # disable all activities depending on qml-box2d
-  set(_disabled_activities "balancebox")
-  message(STATUS "Disabling qml-box2d module and depending activities: ${_disabled_activities}")
-else()
-  include(qt_helper)
-
-  getQtQmlPath(_qt_qml_system_path)
-  set (_box2d_system_dir "${_qt_qml_system_path}/Box2D.2.0")
-
-  if (${QML_BOX2D_MODULE} STREQUAL "submodule")
-    message(STATUS "Building qml-box2d module from submodule")
-    set(_need_box2d_submodule "TRUE")
-  else()
-    # try to find module in system scope
-    find_library(QML_BOX2D_LIBRARY NAMES Box2D libBox2D PATHS ${_box2d_system_dir} NO_DEFAULT_PATH)
-    if (QML_BOX2D_LIBRARY)
-      message(STATUS "Using system qml-box2d plugin at ${QML_BOX2D_LIBRARY}")
-      # for packaging builds, copy the module manually to the correct location
-      if(SAILFISHOS)
-        file(COPY ${_box2d_system_dir}/qmldir ${QML_BOX2D_LIBRARY} DESTINATION share/harbour-gcompris-qt/lib/qml/Box2D.2.0)
-      elseif(ANDROID)
-        file(COPY ${_box2d_system_dir}/qmldir ${QML_BOX2D_LIBRARY} DESTINATION lib/qml/Box2D.2.0)
-      endif()
-      # FIXME: add others as needed
-    else()
-      if (${QML_BOX2D_MODULE} STREQUAL "auto")
-        message(STATUS "Did not find the qml-box2d module in system scope, falling back to submodule build ...")
-        set (_need_box2d_submodule "TRUE")
-      else()
-        message(FATAL_ERROR "Did not find the qml-box2d module in system scope and submodule build was not requested. Can't continue!")
-      endif()
-    endif()
-  endif()
-
-  if (_need_box2d_submodule)
-    # build qml-box2d ourselves from submodule
-    include(ExternalProject)
-    get_property(_qmake_program TARGET ${Qt5Core_QMAKE_EXECUTABLE} PROPERTY IMPORT_LOCATION)
-    set (_box2d_source_dir ${CMAKE_CURRENT_SOURCE_DIR}/external/qml-box2d)
-    if(WIN32)
-      set (_box2d_library_dir "release/")
-      set (_box2d_library_file "Box2D.dll")
-    else()
-      set (_box2d_library_dir "")
-      set (_box2d_library_file "libBox2D.so")
-    endif()
-    set (_box2d_install_dir ${CMAKE_CURRENT_BINARY_DIR}/lib/qml/Box2D.2.0)
-    # make sure submodule is up2date
-    find_package(Git)
-    if(GIT_FOUND)
-      execute_process(COMMAND ${GIT_EXECUTABLE} submodule update --init)
-    endif()
-
-    ExternalProject_Add(qml_box2d
-      DOWNLOAD_COMMAND ""
-      SOURCE_DIR ${_box2d_source_dir}
-      CONFIGURE_COMMAND ${_qmake_program} ${_box2d_source_dir}/box2d.pro
-      BUILD_COMMAND ${CMAKE_MAKE_PROGRAM}
-      INSTALL_DIR ${_box2d_install_dir}
-      INSTALL_COMMAND cp ${_box2d_library_dir}${_box2d_library_file} ${_box2d_source_dir}/qmldir ${_box2d_install_dir}
-      )
-
-    add_library(qml-box2d SHARED IMPORTED)
-    set_target_properties(qml-box2d PROPERTIES IMPORTED_LOCATION ${_box2d_install_dir}/${_box2d_library_file})
-
-    if(SAILFISHOS)
-      install(DIRECTORY ${_box2d_install_dir} DESTINATION share/harbour-gcompris-qt/lib/qml)
-    else()
-      install(DIRECTORY ${_box2d_install_dir} DESTINATION lib/qml)
-    endif()
-  endif()
-endif()
-
-add_subdirectory(src)
+add_custom_target(binaries)
+add_dependencies(binaries ${GCOMPRIS_EXECUTABLE_NAME} rcc_core rcc_menu rcc_activities all_activities)

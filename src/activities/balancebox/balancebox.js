@@ -16,7 +16,7 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 /* ToDo:
@@ -27,7 +27,7 @@
     arbitrary order
 */
 .pragma library
-.import QtQuick 2.0 as Quick
+.import QtQuick 2.6 as Quick
 .import GCompris 1.0 as GCompris
 .import Box2D 2.0 as Box2D
 .import "qrc:/gcompris/src/core/core.js" as Core
@@ -73,7 +73,6 @@ var contacts = new Array();
 var ballContacts = new Array();
 var goalUnlocked;
 var lastContact;
-var ballContacts;
 var wallComponent = Qt.createComponent("qrc:/gcompris/src/activities/balancebox/Wall.qml");
 var contactComponent = Qt.createComponent("qrc:/gcompris/src/activities/balancebox/BalanceContact.qml");
 var balanceItemComponent = Qt.createComponent("qrc:/gcompris/src/activities/balancebox/BalanceItem.qml");
@@ -108,9 +107,17 @@ function start(items_) {
             }
         }
         var levelsFile;
-        if (items.levelSet === "user")
-            levelsFile = userFile;
+        if (items.levelSet === "user" && items.file.exists(items.filePath))
+            levelsFile = items.filePath;
         else {
+            if(items.levelSet === "user") {
+                Core.showMessageDialog(items.background,
+                                        // The argument represents the file path name to be loaded.
+                                       qsTr("The file '%1' is missing!<br>Falling back to builtin levels.").arg(items.filePath),
+                                       "", null,
+                                       "", null,
+                                       null);
+            }
             levelsFile = builtinFile;
             currentLevel = GCompris.ApplicationSettings.loadActivityProgress(
                         "balancebox");
@@ -165,19 +172,18 @@ function sinDeg(num)
 function moveBall()
 {
     var dt = step / 1000;
-    var dvx = ((m*g*dt) * sinDeg(items.tilt.yRotation)) / m;
-    var dvy = ((m*g*dt) * sinDeg(items.tilt.xRotation)) / m;
+    var dvx = g*dt * sinDeg(items.tilt.yRotation);
+    var dvy = g*dt * sinDeg(items.tilt.xRotation);
 
 //    console.log("moving ball: dv: " + items.ball.body.linearVelocity.x
 //            + "/" + items.ball.body.linearVelocity.y
 //            +  " -> " + (items.ball.body.linearVelocity.x+dvx)
 //            + "/" + (items.ball.body.linearVelocity.y+dvy));
-    
+
     items.ball.body.linearVelocity.x += dvx * vFactor;
     items.ball.body.linearVelocity.y += dvy * vFactor;
     
     checkBallContacts();
-
 }
 
 function checkBallContacts()
@@ -188,19 +194,19 @@ function checkBallContacts()
             items.ball.y > ballContacts[k].y - items.ballSize/2 &&
             items.ball.y < ballContacts[k].y + items.ballSize/2) {
             // collision
-            if (ballContacts[k].categories == items.holeType)
+            if (ballContacts[k].categories === items.holeType)
                 finishBall(false, ballContacts[k].x, ballContacts[k].y);
-            else if (ballContacts[k].categories == items.goalType && goalUnlocked)
+            else if (ballContacts[k].categories === items.goalType && goalUnlocked)
                 finishBall(true,
                            ballContacts[k].x + (items.cellSize - items.wallSize - items.ballSize)/2,
                            ballContacts[k].y + (items.cellSize - items.wallSize - items.ballSize)/2);
-            else if (ballContacts[k].categories == items.buttonType) {
+            else if (ballContacts[k].categories === items.buttonType) {
                 if (!ballContacts[k].pressed
-                    && ballContacts[k].orderNum == lastContact + 1)
+                    && ballContacts[k].orderNum === lastContact + 1)
                 {
                     ballContacts[k].pressed = true;
                     lastContact = ballContacts[k].orderNum;
-                    if (lastContact == contacts.length) {
+                    if (lastContact === contacts.length) {
                         items.audioEffects.play("qrc:/gcompris/src/core/resource/sounds/win.wav");
                         goalUnlocked = true;
                         goal.imageSource = baseUrl + "/door.svg";
@@ -234,6 +240,11 @@ function finishBall(won, x, y)
 function stop() {
     // reset everything
     tearDown();
+
+    if(goal) {
+        goal.destroy()
+        goal = null
+    }
     // unlock screen orientation
     if (GCompris.ApplicationInfo.isMobile) {
         GCompris.ApplicationInfo.setKeepScreenOn(false);
@@ -265,7 +276,7 @@ function incubateObject(targetArr, component, properties)
     }
     incubators.push(incubator);
     if (incubator.status === Qml.Component.Ready)
-        targetAttr.push(incubator.object);
+        targetArr.push(incubator.object);
     else if (incubator.status === Qml.Component.Loading) {
         pendingObjects++;
         incubator.onStatusChanged = function(status) {
@@ -290,7 +301,6 @@ function incubateObject(targetArr, component, properties)
 
 function initMap()
 {
-    var modelMap = new Array();
     incubators = new Array();
     goalUnlocked = true;
     finishRunning = false;
@@ -301,12 +311,13 @@ function initMap()
         for (var col = 0; col < map[row].length; col++) {
             var x = col * items.cellSize;
             var y = row * items.cellSize;
-            var orderNum = (map[row][col] & 0xFF00) >> 8;
+            var currentCase = map[row][col];
+            var orderNum = (currentCase & 0xFF00) >> 8;
             // debugging:
             if (debugDraw) {
                 try {
                     var rect = Qt.createQmlObject(
-                                "import QtQuick 2.0;Rectangle{"
+                                "import QtQuick 2.6;Rectangle{"
                                 +"width:" + items.cellSize +";"
                                 +"height:" + items.cellSize+";"
                                 +"x:" + x + ";"
@@ -319,7 +330,7 @@ function initMap()
                     console.error("Error creating object: " + e);
                 }
             }
-            if (map[row][col] & NORTH) {
+            if (currentCase & NORTH) {
                 incubateObject(walls, wallComponent, {
                                    x: x-items.wallSize/2,
                                    y: y-items.wallSize/2,
@@ -327,7 +338,7 @@ function initMap()
                                    height: items.wallSize,
                                    shadow: false});
             }
-            if (map[row][col] & SOUTH) {
+            if (currentCase & SOUTH) {
                 incubateObject(walls, wallComponent, {
                                    x: x-items.wallSize/2,
                                    y: y+items.cellSize-items.wallSize/2,
@@ -335,7 +346,7 @@ function initMap()
                                    height: items.wallSize,
                                    shadow: false});
             }
-            if (map[row][col] & EAST) {
+            if (currentCase & EAST) {
                 incubateObject(walls, wallComponent, {
                                    x: x+items.cellSize-items.wallSize/2,
                                    y: y-items.wallSize/2,
@@ -343,7 +354,7 @@ function initMap()
                                    height: items.cellSize+items.wallSize,
                                    shadow: false});
             }
-            if (map[row][col] & WEST) {
+            if (currentCase & WEST) {
                 incubateObject(walls, wallComponent, {
                                    x: x-items.wallSize/2,
                                    y: y-items.wallSize/2,
@@ -352,16 +363,17 @@ function initMap()
                                    shadow: false});
             }
 
-            if (map[row][col] & START) {
+            if (currentCase & START) {
                 items.ball.x = col * items.cellSize + items.wallSize;
                 items.ball.y = row * items.cellSize + items.wallSize;
                 items.ball.visible = true;
             }
             
-            if (map[row][col] & GOAL) {
+            if (currentCase & GOAL) {
                 var goalX = col * items.cellSize + items.wallSize/2;
                 var goalY = row * items.cellSize + items.wallSize/2;
-                goal = createObject(goalComponent, {
+                if(goal === null) {
+                    goal = createObject(goalComponent, {
                                         x: goalX,
                                         y: goalY,
                                         width: items.cellSize - items.wallSize,
@@ -369,9 +381,17 @@ function initMap()
                                         imageSource: baseUrl + "/door_closed.svg",
                                         categories: items.goalType,
                                         sensor: true});
+                }
+                else {
+                    goal.x = goalX;
+                    goal.y = goalY;
+                    goal.width = items.cellSize - items.wallSize;
+                    goal.height = goal.width;
+                    goal.imageSource = baseUrl + "/door_closed.svg";
+                }
             }
             
-            if (map[row][col] & HOLE) {
+            if (currentCase & HOLE) {
                 var holeX = col * items.cellSize + items.wallSize;
                 var holeY = row * items.cellSize + items.wallSize;
                 incubateObject(holes, balanceItemComponent, {
@@ -454,9 +474,6 @@ function tearDown()
         contacts.length = 0;
     }
     lastContact = 0;
-    if (goal)
-        goal.destroy();
-    goal = null;
     items.tilt.xRotation = 0;
     items.tilt.yRotation = 0;
     ballContacts = new Array();
@@ -533,7 +550,7 @@ function processKeyRelease(key)
 }
 
 function nextLevel() {
-    if(numberOfLevel <= ++currentLevel ) {
+    if(numberOfLevel <= ++currentLevel) {
         currentLevel = 0
     }
     initLevel();

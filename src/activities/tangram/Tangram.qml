@@ -17,10 +17,9 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
-import QtQuick 2.1
-import QtGraphicalEffects 1.0
+import QtQuick 2.6
 import GCompris 1.0
 
 import "../../core"
@@ -34,13 +33,16 @@ ActivityBase {
     onStart: focus = true
     onStop: {}
 
+    property var dataset: Dataset
+    property string resourceUrl: "qrc:/gcompris/src/activities/tangram/resource/"
+
     Keys.onPressed: Activity.processPressedKey(event)
 
     pageComponent: Item {
         id: background
         anchors.fill: parent
 
-        property bool horizontalLayout: background.width > background.height
+        property bool horizontalLayout: background.width >= background.height
         property int playX: (activity.width - playWidth) / 2
         property int playY: (activity.height - playHeight) / 2
         property int playWidth: horizontalLayout ? activity.height : activity.width
@@ -56,7 +58,7 @@ ActivityBase {
 
         Image {
             id: bg
-            source: Activity.url + "tangram/background.svg"
+            source: activity.resourceUrl + "tangram/background.svg"
             sourceSize.width: 2000 * ApplicationInfo.ratio
             sourceSize.height: 2000 * ApplicationInfo.ratio
             width: 2000 * background.playRatio
@@ -89,9 +91,9 @@ ActivityBase {
             property alias modelListModel: modelList.model
             property alias userList: userList
             property alias userListModel: userList.model
-            property Item selectedITem
-            property var currentTans: Dataset.dataset[bar.level - 1]
-            property int numberOfLevel: Dataset.dataset.length
+            property Item selectedItem
+            property var currentTans: dataset.dataset[bar.level - 1]
+            property int numberOfLevel: dataset.dataset.length
             property bool editionMode: false
         }
 
@@ -102,7 +104,7 @@ ActivityBase {
 
         Image {
             id: bgData
-            source: items.currentTans.bg ? Activity.url + items.currentTans.bg : ''
+            source: items.currentTans.bg ? activity.resourceUrl + items.currentTans.bg : ''
             sourceSize.width: 1000 * background.playRatio
             sourceSize.height: 1000 * background.playRatio
             width: 1000 * background.playRatio
@@ -129,27 +131,13 @@ ActivityBase {
                     id: tansModel
                     x: background.playX + background.playWidth * modelData.x - width / 2
                     y: background.playY + background.playHeight * modelData.y - height / 2
-                    source: Activity.url + modelData.img
+                    source: activity.resourceUrl + "m-" + modelData.img
                     sourceSize.width: modelData.width * background.playWidth
                     sourceSize.height: modelData.height * background.playWidth
                     z: index
-                    visible: false
-                }
-                Rectangle {
-                    id: mask
-                    anchors.fill: tansModel
-                    color: items.currentTans.colorMask
-                    visible: false
-                }
-                OpacityMask {
-                    anchors.fill: tansModel
-                    source: mask
-                    maskSource: tansModel
-                    rotation: modelData.flipping ? 360 - modelData.rotation : modelData.rotation
-                    transform: Scale {
-                        origin.x: modelData.width * background.playWidth / 2
-                        xScale: modelData.flipping ? -1 : 1
-                    }
+                    rotation: modelData.rotation
+                    mirror: modelData.flipping ? true : false
+                    visible: true
                 }
             }
         }
@@ -157,23 +145,39 @@ ActivityBase {
         Repeater {
             id: userList
             model: items.currentTans.pieces
-            Image {
-                id: tans
-                x: background.playX + background.playWidth * xRatio - width / 2
-                y: background.playY + background.playHeight * yRatio - height / 2
-                mirror: !items.editionMode ? modelData.initFlipping : modelData.flipping
-                rotation: !items.editionMode ? modelData.initRotation : modelData.rotation
-                source: Activity.url + modelData.img
-                sourceSize.width: modelData.width * background.playWidth
-                sourceSize.height: modelData.height * background.playWidth
-                z: 100 + index
+            Item {
+                id: tansItem
+                x: background.playX + background.playWidth * xRatio - tans.width / 2
+                y: background.playY + background.playHeight * yRatio - tans.height / 2
+                width: tans.width
+                height: tans.height
 
+                z: 100 + index
                 property real xRatio: !items.editionMode ? modelData.initX : modelData.x
                 property real yRatio: !items.editionMode ? modelData.initY : modelData.y
                 property bool selected: false
                 property int animDuration: 48
                 property bool flippable: modelData.flippable
                 property bool rotable: modelData.moduloRotation != 0
+
+                property alias tans: tans
+                rotation: !items.editionMode ? modelData.initRotation : modelData.rotation
+                property alias mirror: tans.mirror
+                function restoreZindex() {
+                    z = 100 + index
+                }
+
+                onSelectedChanged: {
+                    if(!selected)
+                        restoreZindex()
+                }
+
+                function positionToTans() {
+                    return [
+                    (x + width / 2 - background.playX) / background.playWidth,
+                    (y + height / 2 - background.playY) / background.playHeight
+                    ]
+                }
 
                 // After a drag the [x, y] positions are addressed directly breaking our
                 // binding. Call me to reset the binding.
@@ -182,23 +186,19 @@ ActivityBase {
                     y = Qt.binding(function() { return background.playY + background.playHeight * yRatio - height / 2 })
                 }
 
-                function restoreZindex() {
-                    z = 100 + index
+                Image {
+                    id: tans
+                    mirror: !items.editionMode ? modelData.initFlipping : modelData.flipping
+                    source: activity.resourceUrl + modelData.img
+                    sourceSize.width: modelData.width * background.playWidth
+                    sourceSize.height: modelData.height * background.playWidth
                 }
-
-                function positionToTans() {
-                    return [
-                                (x + width / 2 - background.playX) / background.playWidth,
-                                (y + height / 2 - background.playY) / background.playHeight
-                            ]
-                }
-
                 // Manage to return a base rotation as it was provided in the model
                 function rotationToTans() {
                     // moduloRotation == 0 to disable rotation, assume 360 in this case
                     var mod = modelData.moduloRotation ? modelData.moduloRotation : 360
                     if(modelData.flipable || modelData.flipping || !mirror)
-                        return rotation >= 0 ? rotation % mod : (360 + rotation) % mod
+                         return rotation >= 0 ? rotation % mod : (360 + rotation) % mod
                     else
                         // It flipping but model is not flipping sensitive we have to rotate accordingly
                         return rotation >= 0 ? (rotation - (mod - 90)) % mod : (360 + rotation - (mod - 90)) % mod
@@ -225,21 +225,16 @@ ActivityBase {
                 Drag.hotSpot.x : width / 2
                 Drag.hotSpot.y : height / 2
 
-                onSelectedChanged: {
-                    if(!selected)
-                        tans.restoreZindex()
-                }
-
                 MouseArea {
                     id: dragArea
                     anchors.fill: parent
                     drag.target: parent
                     onPressed: {
-                        parent.z = 200
-                        if(items.selectedITem && items.selectedITem != tans)
-                            items.selectedITem.selected = false
-                        items.selectedITem = tans
-                        parent.selected = true
+                        tansItem.z = 200
+                        if(items.selectedItem && items.selectedItem != tansItem)
+                        items.selectedItem.selected = false
+                        items.selectedItem = tansItem
+                        tansItem.selected = true
                         background.checkWin()
                     }
                     onDoubleClicked: {
@@ -250,37 +245,14 @@ ActivityBase {
                         var posTans = positionToTans()
                         var closest = Activity.getClosest(posTans)
                         if(closest && !items.editionMode) {
-                            tans.xRatio = closest[0]
-                            tans.yRatio = closest[1]
+                            tansItem.xRatio = closest[0]
+                            tansItem.yRatio = closest[1]
                         } else {
-                            tans.xRatio = posTans[0]
-                            tans.yRatio = posTans[1]
+                            tansItem.xRatio = posTans[0]
+                            tansItem.yRatio = posTans[1]
                         }
-                        tans.restoreBindings()
+                        tansItem.restoreBindings()
                         background.checkWin()
-                    }
-                }
-
-                Colorize {
-                    id: color
-                    anchors.fill: parent
-                    source: parent
-                    hue: 0.6
-                    lightness: -0.2
-                    saturation: 0.5
-                    opacity: parent.selected ? 1 : 0
-                }
-
-                Behavior on x {
-                    PropertyAnimation  {
-                        duration: tans.animDuration
-                        easing.type: Easing.InOutQuad
-                    }
-                }
-                Behavior on y {
-                    PropertyAnimation  {
-                        duration: tans.animDuration
-                        easing.type: Easing.InOutQuad
                     }
                 }
 
@@ -289,9 +261,9 @@ ActivityBase {
                     source: "qrc:/gcompris/src/core/resource/bar_reload.svg"
                     x: - width
                     y: parent.height / 2 - height / 2
-                    visible: parent.selected && parent.rotable
+                    visible: tansItem.selected && tansItem.rotable
                     sourceSize.width: 40 * ApplicationInfo.ratio
-                    z: parent.z + 1
+                    z: tansItem.z + 1
 
                     RotateMouseArea {}
                 }
@@ -301,18 +273,29 @@ ActivityBase {
                     source: "qrc:/gcompris/src/activities/tangram/resource/tangram/flip.svg"
                     x: parent.width / 2 - width / 2
                     y: parent.height - height / 2
-                    visible: parent.selected && parent.flippable
+                    visible: tansItem.selected && tansItem.flippable
                     sourceSize.width: 40 * ApplicationInfo.ratio
-                    z: parent.z + 1
+                    z: tansItem.z + 1
 
                     MouseArea {
                         anchors.fill: parent
-                        onClicked: tans.flipMe()
+                        onClicked: tansItem.flipMe()
                     }
                 }
 
+                Behavior on x {
+                    PropertyAnimation  {
+                        duration: animDuration
+                        easing.type: Easing.InOutQuad
+                    }
+                }
+                Behavior on y {
+                    PropertyAnimation  {
+                        duration: animDuration
+                        easing.type: Easing.InOutQuad
+                    }
+                }
             }
-
             // Return the tans model of all the user tans
             function asTans() {
                 var tans = []
@@ -323,7 +306,7 @@ ActivityBase {
             }
         }
 
-        // We use a timere here because we have to check only once the potential
+        // We use a timer here because we have to check only once the potential
         // animation are over
         Timer {
             id: checkWinTimer

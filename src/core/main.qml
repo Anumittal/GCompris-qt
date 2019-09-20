@@ -16,11 +16,11 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
-import QtQuick 2.2
-import QtQuick.Controls 1.0
-import QtQuick.Window 2.1
+import QtQuick 2.6
+import QtQuick.Controls 1.5
+import QtQuick.Window 2.2
 import QtQml 2.2
 
 import GCompris 1.0
@@ -44,8 +44,8 @@ import "qrc:/gcompris/src/core/core.js" as Core
 Window {
     id: main
     // Start in window mode at full screen size
-    width: Screen.width
-    height: Screen.height
+    width: ApplicationSettings.previousWidth
+    height: ApplicationSettings.previousHeight
     minimumWidth: 400 * ApplicationInfo.ratio
     minimumHeight: 400 * ApplicationInfo.ratio
     title: "GCompris"
@@ -53,6 +53,7 @@ Window {
     /// @cond INTERNAL_DOCS
 
     property var applicationState: Qt.application.state
+    property bool isMusicalActivityRunning: false
 
     onApplicationStateChanged: {
         if (ApplicationInfo.isMobile && applicationState != Qt.ApplicationActive) {
@@ -85,7 +86,7 @@ Window {
 
         Component.onCompleted: {
             if(ApplicationSettings.isAudioEffectsEnabled)
-                append(ApplicationInfo.getAudioFilePath("qrc:/gcompris/src/core/resource/intro.$CA"))
+                audioVoices.append(ApplicationInfo.getAudioFilePath("qrc:/gcompris/src/core/resource/intro.$CA"))
 
             if (DownloadManager.areVoicesRegistered())
                 delayedWelcomeTimer.playWelcome();
@@ -97,36 +98,41 @@ Window {
         }
     }
 
-    GCAudio {
+    GCSfx {
         id: audioEffects
-        muted: !ApplicationSettings.isAudioEffectsEnabled
+        muted: !ApplicationSettings.isAudioEffectsEnabled && !main.isMusicalActivityRunning
     }
 
     function playIntroVoice(name) {
         name = name.split("/")[0]
-        audioVoices.append(ApplicationInfo.getAudioFilePath("voices-$CA/$LOCALE/intro/" + name + ".$CA"))
+        audioVoices.play(ApplicationInfo.getAudioFilePath("voices-$CA/$LOCALE/intro/" + name + ".$CA"))
     }
 
     function checkWordset() {
-        if(ApplicationSettings.wordset == '')
-            return
+        var wordset = ApplicationSettings.wordset
+        if(wordset == '')
+            // Maybe the wordset has been bundled or copied manually
+            // we have to register it if we find it.
+            wordset = 'data2/words/words.rcc'
 
         // check for words.rcc:
         if (DownloadManager.isDataRegistered("words")) {
             // words.rcc is already registered -> nothing to do
-        } else if(DownloadManager.haveLocalResource(ApplicationSettings.wordset)) {
+        } else if(DownloadManager.haveLocalResource(wordset)) {
             // words.rcc is there -> register old file first
             // then try to update in the background
-            DownloadManager.updateResource(ApplicationSettings.wordset);
-        } else {
+            if(DownloadManager.updateResource(wordset)) {
+                ApplicationSettings.wordset = wordset
+            }
+        } else if(ApplicationSettings.wordset) { // Only if wordset specified
             // words.rcc has not been downloaded yet -> ask for download
             Core.showMessageDialog(
                         main,
-                        qsTr("The images for several activities are not yet installed.")
-                        + qsTr("Do you want to download them now?"),
+                        qsTr("The images for several activities are not yet installed. " +
+                        "Do you want to download them now?"),
                         qsTr("Yes"),
                         function() {
-                            if (DownloadManager.downloadResource(ApplicationSettings.wordset))
+                            if (DownloadManager.downloadResource(wordset))
                                 var downloadDialog = Core.showDownloadDialog(pageView.currentItem, {});
                         },
                         qsTr("No"), null,
@@ -143,9 +149,11 @@ Window {
                     + ", ratio=" + ApplicationInfo.ratio
                     + ", fontRatio=" + ApplicationInfo.fontRatio
                     + ", dpi=" + Math.round(Screen.pixelDensity*25.4)
-                    + ", sharedWritablePath=" + ApplicationInfo.getSharedWritablePath()
+                    + ", userDataPath=" + ApplicationSettings.userDataPath
                     + ")");
-        if (ApplicationSettings.exeCount == 1 && !ApplicationSettings.isKioskMode) {
+        if (ApplicationSettings.exeCount === 1 &&
+                !ApplicationSettings.isKioskMode &&
+                ApplicationInfo.isDownloadAllowed) {
             // first run
             var dialog;
             dialog = Core.showMessageDialog(
@@ -172,15 +180,21 @@ Window {
                             pageView.currentItem.focus = true
                             checkWordset()
                         }
-            );
+             );
         }
         else {
+            // Register voices-resources for current locale, updates/downloads only if
+            // not prohibited by the settings
+            if (!DownloadManager.areVoicesRegistered()) {
+                DownloadManager.updateResource(
+                    DownloadManager.getVoicesResourceForLocale(ApplicationSettings.locale));
+            }
+
             checkWordset()
 
             if(changelog.isNewerVersion(ApplicationSettings.lastGCVersionRan, ApplicationInfo.GCVersionCode)) {
                 // display log between ApplicationSettings.lastGCVersionRan and ApplicationInfo.GCVersionCode
-                var dialog;
-                dialog = Core.showMessageDialog(
+                Core.showMessageDialog(
                 main,
                 qsTr("GCompris has been updated! Here are the new changes:<br/>") + changelog.getLogBetween(ApplicationSettings.lastGCVersionRan, ApplicationInfo.GCVersionCode),
                 "", null,
@@ -209,13 +223,15 @@ Window {
             }
         }
 
-        focus: ApplicationInfo.QTVersion >= "5.4.0"
+        focus: true
 
         delegate: StackViewDelegate {
             id: root
             function getTransition(properties)
             {
                 audioVoices.clearQueue()
+                audioVoices.stop()
+
                 if(!properties.exitItem.isDialog &&        // if coming from menu and
                         !properties.enterItem.isDialog)    // going into an activity then
                     playIntroVoice(properties.enterItem.activityInfo.name);    // play intro
@@ -228,12 +244,15 @@ Window {
                     if(properties.enterItem.isDialog) {
                         return pushVTransition
                     } else {
+                        if(properties.enterItem.isMusicalActivity)
+                            main.isMusicalActivityRunning = true
                         return pushHTransition
                     }
                 } else {
                     if(properties.exitItem.isDialog) {
                         return popVTransition
                     } else {
+                        main.isMusicalActivityRunning = false
                         return popHTransition
                     }
 
@@ -327,6 +346,5 @@ Window {
             property Component replaceTransition: pushHTransition
         }
     }
-
     /// @endcond
 }

@@ -17,10 +17,10 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
-import QtQuick 2.2
+import QtQuick 2.6
 import GCompris 1.0
 
 import "../../core"
@@ -34,7 +34,7 @@ ActivityBase {
     pageComponent: Image {
         id: background
         source: "qrc:/gcompris/src/activities/menu/resource/background.svg"
-        sourceSize.width: parent.width
+        sourceSize.width: Math.max(parent.width, parent.height)
         fillMode: Image.PreserveAspectCrop
         signal start
         signal stop
@@ -67,7 +67,6 @@ ActivityBase {
         MultiPointTouchArea {
             anchors.fill: parent
             onPressed: checkTouchPoint(touchPoints)
-            onTouchUpdated: checkTouchPoint(touchPoints)
         }
 
         Item {
@@ -112,7 +111,7 @@ ActivityBase {
 
         Bonus {
             id: bonus
-            interval: 3000
+            interval: 2000
             Component.onCompleted: win.connect(Activity.nextLevel)
         }
     }

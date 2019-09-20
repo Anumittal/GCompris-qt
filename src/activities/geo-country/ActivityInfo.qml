@@ -16,7 +16,7 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 import GCompris 1.0
@@ -24,16 +24,21 @@ import GCompris 1.0
 ActivityInfo {
   name: "geo-country/GeoCountry.qml"
   difficulty: 2
-  icon: "geo-country/france_region.svg"
+  icon: "geo-country/geo-country.svg"
   author: "Pulkit Gupta &lt;pulkitgenius@gmail.com&gt;"
   demo: true
+  //: Activity title
   title: qsTr("Locate the region")
+  //: Help title
   description: qsTr("Drag and Drop the regions to redraw the whole country")
-//  intro: "Slide the regions to redraw the whole country"
+//  intro: "Drag and drop the regions to complete the country maps."
+  //: Help goal
   goal: ""
+  //: Help prerequisite
   prerequisite: ""
-  manual: ""
-  credit: qsTr("The map of Germany comes from Wikipedia and is released under the GNU Free Documentation License. Olaf Ronneberger and his children Lina and Julia Ronneberger created the German level.")
-  section: "discovery"
+  //: Help manual
+  manual: qsTr("Drag and drop different regions of the country to correct locations to redraw the whole country.")
+  credit: ""
+  section: "sciences geography"
   createdInVersion: 4000
 }

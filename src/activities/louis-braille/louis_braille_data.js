@@ -13,14 +13,14 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 var baseUrl = "qrc:/gcompris/src/activities/louis-braille/resource/"
 
 var dataset = [
             {
-                 "text": qsTr("Born on January 4th 1809 in Coupvary near Paris in France."),
+                 "text": qsTr("Born on January 4th 1809 in Coupvray near Paris in France."),
                  "year": "1809",
                  "img": baseUrl + "louis.png"
              },

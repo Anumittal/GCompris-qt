@@ -17,9 +17,9 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
-import QtQuick 2.1
+import QtQuick 2.6
 import GCompris 1.0
 import "../../core"
 import "clickgame.js" as Activity
@@ -38,7 +38,7 @@ ActivityBase {
         focus: true
         fillMode: Image.PreserveAspectCrop
         source: "qrc:/gcompris/src/activities/clickgame/resource/sea1.jpg"
-        sourceSize.width: parent.width
+        sourceSize.width: Math.max(parent.width, parent.height)
 
         Component.onCompleted: {
             activity.start.connect(start)
@@ -58,7 +58,9 @@ ActivityBase {
 
         Timer {
             id: timer
-            interval: 5000; running: true; repeat: true
+            interval: 5000
+            running: true
+            repeat: true
             onTriggered: activity.audioEffects.play("qrc:/gcompris/src/activities/clickgame/resource/bubble.wav")
         }
 
@@ -71,9 +73,10 @@ ActivityBase {
             id: score
 
             anchors {
-                bottom: parent.bottom
+                top: parent.top
+                bottom: undefined
                 right: parent.right
-                margins: 20 * ApplicationInfo.ratio
+                margins: 10 * ApplicationInfo.ratio
             }
         }
 

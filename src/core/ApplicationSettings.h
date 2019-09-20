@@ -1,4 +1,4 @@
-/* GCompris - ApplicationSettingsDefault.cpp
+/* GCompris - ApplicationSettings.h
  *
  * Copyright (C) 2014 Johnny Jazeix <jazeix@gmail.com>
  *
@@ -16,7 +16,7 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #ifndef APPLICATIONSETTINGS_H
@@ -24,11 +24,13 @@
 
 #include <QObject>
 #include <QQmlEngine>
-#include <QUrl>
 #include <QtGlobal>
 #include <QDebug>
 
 #include <QSettings>
+#include <QStandardPaths>
+
+#include <config.h>
 
 #define GC_DEFAULT_LOCALE "system"
 
@@ -85,6 +87,16 @@ class ApplicationSettings : public QObject
 	 * Whether GCompris should run in fullscreen mode.
 	 */
     Q_PROPERTY(bool isFullscreen READ isFullscreen WRITE setFullscreen NOTIFY fullscreenChanged)
+
+    /**
+     * Window Height on Application's Startup
+     */
+    Q_PROPERTY(quint32 previousHeight READ previousHeight WRITE setPreviousHeight NOTIFY previousHeightChanged)
+
+    /**
+     * Window Width on Application's Startup
+     */
+    Q_PROPERTY(quint32 previousWidth READ previousWidth WRITE setPreviousWidth NOTIFY previousWidthChanged)
 
     /**
      * Whether on-screen keyboard should be enabled per default in activities
@@ -224,6 +236,28 @@ class ApplicationSettings : public QObject
      */
     Q_PROPERTY(QString downloadServerUrl READ downloadServerUrl WRITE setDownloadServerUrl NOTIFY downloadServerUrlChanged)
 
+    /**
+     * Path where resources are downloaded and stored.
+     *
+     * @sa DownloadManager
+     */
+    Q_PROPERTY(QString cachePath READ cachePath WRITE setCachePath NOTIFY cachePathChanged)
+
+    /**
+     * Return the platform specific path for storing data shared between apps
+     *
+     * On Android: /storage/emulated/0/GCompris (>= Android 4.2),
+     *             /storage/sdcard0/GCompris (< Android 4.2)
+     * On Linux: $HOME/local/share/GCompris
+     */
+    Q_PROPERTY(QString userDataPath READ userDataPath WRITE setUserDataPath NOTIFY userDataPathChanged)
+
+    /**
+      * Define the renderer used.
+      * Either openGL or software renderer (only for Qt >= 5.8)
+      */
+    Q_PROPERTY(QString renderer READ renderer WRITE setRenderer NOTIFY rendererChanged)
+
     // internal group
     Q_PROPERTY(quint32 exeCount READ exeCount WRITE setExeCount NOTIFY exeCountChanged)
 
@@ -235,9 +269,9 @@ class ApplicationSettings : public QObject
 
 public:
 	/// @cond INTERNAL_DOCS
-    explicit ApplicationSettings(QObject *parent = 0);
-    ~ApplicationSettings();
-    static void init();
+    explicit ApplicationSettings(const QString &configPath = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)
+         + "/gcompris/" + GCOMPRIS_APPLICATION_NAME + ".conf", QObject *parent = 0);
+    virtual ~ApplicationSettings();
     // It is not recommended to create a singleton of Qml Singleton registered
     // object but we could not found a better way to let us access ApplicationInfo
     // on the C++ side. All our test shows that it works.
@@ -247,8 +281,8 @@ public:
         }
         return m_instance;
     }
-    static QObject *systeminfoProvider(QQmlEngine *engine,
-                                       QJSEngine *scriptEngine);
+    static QObject *applicationSettingsProvider(QQmlEngine *engine,
+                                                QJSEngine *scriptEngine);
 
     bool showLockedActivities() const { return m_showLockedActivities; }
     void setShowLockedActivities(const bool newMode) {
@@ -262,10 +296,10 @@ public:
         emit audioVoicesEnabledChanged();
     }
 
-	bool isAudioEffectsEnabled() const { return m_isAudioEffectsEnabled; }
-	void setIsAudioEffectsEnabled(const bool newMode) {
-		m_isAudioEffectsEnabled = newMode;
-		emit audioEffectsEnabledChanged();
+    bool isAudioEffectsEnabled() const { return m_isAudioEffectsEnabled; }
+    void setIsAudioEffectsEnabled(const bool newMode) {
+        m_isAudioEffectsEnabled = newMode;
+        emit audioEffectsEnabledChanged();
     }
 
     bool isFullscreen() const { return m_isFullscreen; }
@@ -273,6 +307,22 @@ public:
         if(m_isFullscreen != newMode) {
             m_isFullscreen = newMode;
             emit fullscreenChanged();
+        }
+    }
+
+    quint32 previousHeight() const { return m_previousHeight; }
+    void setPreviousHeight(quint32 height) {
+        if(m_previousHeight != height) {
+            m_previousHeight = height;
+            emit previousHeightChanged();
+        }
+    }
+
+    quint32 previousWidth() const { return m_previousWidth; }
+    void setPreviousWidth(quint32 width) {
+        if(m_previousWidth != width) {
+            m_previousWidth = width;
+            emit previousWidthChanged();
         }
     }
 
@@ -285,13 +335,13 @@ public:
     QString locale() const {
         return m_locale;
     }
-    void setLocale(const QString newLocale) {
+    void setLocale(const QString &newLocale) {
         m_locale = newLocale;
         emit localeChanged();
     }
 
     QString font() const { return m_font; }
-    void setFont(const QString newFont) {
+    void setFont(const QString &newFont) {
         m_font = newFont;
         emit fontChanged();
     }
@@ -336,9 +386,9 @@ public:
     void setDemoMode(const bool newMode);
 
     QString codeKey() const { return m_codeKey; }
-    void setCodeKey(const QString newCodeKey) {
+    void setCodeKey(const QString &newCodeKey) {
         m_codeKey = newCodeKey;
-        emit notifyCodeKeyChanged();
+        emit codeKeyChanged();
     }
 
     /**
@@ -360,7 +410,7 @@ public:
      *           1 if the code is valid but out of date
      *           2 if the code is valid and under 2 years
      */
-    Q_INVOKABLE uint checkActivationCode(const QString code);
+    Q_INVOKABLE uint checkActivationCode(const QString &code);
 
     /**
      * Check Payment API
@@ -383,17 +433,28 @@ public:
 	}
 
     QString wordset() const { return m_wordset; }
-    void setWordset(const QString newWordset) {
+    void setWordset(const QString &newWordset) {
         m_wordset = newWordset;
         emit wordsetChanged();
     }
 
     QString downloadServerUrl() const { return m_downloadServerUrl; }
-    void setDownloadServerUrl(const QString newDownloadServerUrl) {
+    void setDownloadServerUrl(const QString &newDownloadServerUrl) {
         m_downloadServerUrl = newDownloadServerUrl;
         emit downloadServerUrlChanged();
     }
 
+    QString cachePath() const { return m_cachePath; }
+    void setCachePath(const QString &newCachePath) {
+        m_cachePath = newCachePath;
+        emit cachePathChanged();
+    }
+
+    QString userDataPath() const { return m_userDataPath; }
+    void setUserDataPath(const QString &newUserDataPath) {
+        m_userDataPath = newUserDataPath;
+        emit userDataPathChanged();
+    }
     quint32 exeCount() const { return m_exeCount; }
     void setExeCount(const quint32 newExeCount) {
         m_exeCount = newExeCount;
@@ -421,12 +482,27 @@ public:
         emit lastGCVersionRanChanged();
     }
 
+    QString renderer() const { return m_renderer; }
+    void setRenderer(const QString &newRenderer) {
+        m_renderer = newRenderer;
+        emit rendererChanged();
+    }
+
+    /**
+     * Check if we use the external wordset for activity based on lang_api
+     * @returns  true if wordset is loaded
+     *           false if wordset is not loaded
+     */
+    Q_INVOKABLE bool useExternalWordset();
+
 protected slots:
 
     Q_INVOKABLE void notifyShowLockedActivitiesChanged();
     Q_INVOKABLE void notifyAudioVoicesEnabledChanged();
     Q_INVOKABLE void notifyAudioEffectsEnabledChanged();
     Q_INVOKABLE void notifyFullscreenChanged();
+    Q_INVOKABLE void notifyPreviousHeightChanged();
+    Q_INVOKABLE void notifyPreviousWidthChanged();
     Q_INVOKABLE void notifyVirtualKeyboardChanged();
     Q_INVOKABLE void notifyLocaleChanged();
     Q_INVOKABLE void notifyFontChanged();
@@ -443,10 +519,12 @@ protected slots:
     Q_INVOKABLE void notifyWordsetChanged();
 
     Q_INVOKABLE void notifyDownloadServerUrlChanged();
-
+    Q_INVOKABLE void notifyCachePathChanged();
+    Q_INVOKABLE void notifyUserDataPathChanged();
     Q_INVOKABLE void notifyExeCountChanged();
 
     Q_INVOKABLE void notifyLastGCVersionRanChanged();
+    Q_INVOKABLE void notifyRendererChanged();
 
     Q_INVOKABLE void notifyBarHiddenChanged();
 
@@ -493,6 +571,8 @@ signals:
     void audioVoicesEnabledChanged();
     void audioEffectsEnabledChanged();
     void fullscreenChanged();
+    void previousHeightChanged();
+    void previousWidthChanged();
     void virtualKeyboardChanged();
     void localeChanged();
     void fontChanged();
@@ -510,24 +590,29 @@ signals:
     void baseFontSizeChanged();
 
     void downloadServerUrlChanged();
+    void cachePathChanged();
+    void userDataPathChanged();
 
     void exeCountChanged();
 
     void lastGCVersionRanChanged();
+    void rendererChanged();
     void barHiddenChanged();
 
+protected:
+    static ApplicationSettings *m_instance;
+    
 private:
-
     // Update in configuration the couple {key, value} in the group.
     template<class T> void updateValueInConfig(const QString& group,
                                          const QString& key, const T& value);
-
-    static ApplicationSettings *m_instance;
 
     bool m_showLockedActivities;
     bool m_isAudioVoicesEnabled;
     bool m_isAudioEffectsEnabled;
     bool m_isFullscreen;
+    quint32 m_previousHeight;
+    quint32 m_previousWidth;
     bool m_isVirtualKeyboard;
     bool m_isAutomaticDownloadsEnabled;
     bool m_isEmbeddedFont;
@@ -552,10 +637,13 @@ private:
     const qreal m_fontLetterSpacingMax;
 
     QString m_downloadServerUrl;
+    QString m_cachePath;
+    QString m_userDataPath;
 
     quint32 m_exeCount;
 
     int m_lastGCVersionRan;
+    QString m_renderer;
 
     bool m_isBarHidden;
 

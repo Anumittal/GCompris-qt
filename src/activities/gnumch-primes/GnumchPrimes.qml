@@ -3,8 +3,8 @@
  * Copyright (C) 2014 Manuel Tondeur <manueltondeur@gmail.com>
  *
  * Authors:
- *   <THE GTK VERSION AUTHOR> (GTK+ version)
- *   YOUR NAME <YOUR EMAIL> (Qt Quick port)
+ *   Joe Neeman <spuzzzzzzz@gmail.com> (GTK+ version)
+ *   Manuel Tondeur <manueltondeur@gmail.com> (Qt Quick port)
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -17,9 +17,9 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
-import QtQuick 2.2
+import QtQuick 2.6
 
 import "../../core"
 import "../gnumch-equality/"

@@ -16,12 +16,12 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
-import QtQuick 2.2
+import QtQuick 2.6
 import GCompris 1.0
-import QtQuick.Layouts 1.1
-import QtQuick.Controls 1.0
+import QtQuick.Layouts 1.3
+import QtQuick.Controls 1.5
 import "qrc:/gcompris/src/core/core.js" as Core
 
 /**
@@ -210,6 +210,7 @@ Item {
             text: qsTr("Background")
             style: GCButtonStyle {
                 fixedFontSize: downloadDialog.fixedFontSize
+                theme: "highContrast"
             }
             visible: true
             onClicked: downloadDialog.shutdown();
@@ -227,6 +228,7 @@ Item {
             text: qsTr("Abort")
             style: GCButtonStyle {
                 fixedFontSize: downloadDialog.fixedFontSize
+                theme: "highContrast"
             }
             visible: true
             onClicked: {
@@ -249,7 +251,7 @@ Item {
                     && code != 5) {  // no error: OperationCanceledError
                 // show error message
                 var messageDialog = Core.showMessageDialog(main,
-                                                           qsTr("Download error") + code + ": " + msg,
+                                                           qsTr("Download error (code: %1): %2").arg(code).arg(msg),
                                                            "", null,
                                                            "", null,
                                                            function() {

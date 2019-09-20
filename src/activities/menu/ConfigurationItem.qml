@@ -16,12 +16,12 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
-import QtQuick 2.2
-import QtQuick.Controls 1.0
-import QtQuick.Controls.Styles 1.0
+import QtQuick 2.6
+import QtQuick.Controls 1.5
+import QtQuick.Controls.Styles 1.4
 import GCompris 1.0
 
 import "../../core"
@@ -138,7 +138,7 @@ Item {
                 horizontalAlignment: Text.AlignHCenter
                 width: parent.width
                 wrapMode: TextEdit.WordWrap
-                text: qsTr("On <a href='http://gcompris.net'>http://gcompris.net</a> " +
+                text: qsTr("On <a href='https://gcompris.net'>https://gcompris.net</a> " +
                            "you will find the instructions to obtain an activation code.")
                 Component.onCompleted: ApplicationInfo.isDownloadAllowed ?
                                            linkActivated.connect(Qt.openUrlExternally) : null
@@ -166,7 +166,7 @@ Item {
                         activationMsg.text = qsTr('Sorry, your code is too old for this version of GCompris');
                         break;
                     case 2:
-                        activationMsg.text = qsTr('You code is valid, thanks a lot for your support');
+                        activationMsg.text = qsTr('Your code is valid, thanks a lot for your support');
                         activationCodeEntry.visible = false
                         ApplicationSettings.codeKey = code
                         break;
@@ -242,14 +242,15 @@ Item {
         }
 
         /* Technically wordset config is a string that holds the wordset name or '' for the
-         * internal wordset. But as we support only internal and words its best to show the
-         * user a boolean choice.
-         */
+        * internal wordset. But as we support only internal and words its best to show the
+        * user a boolean choice.
+        */
         GCDialogCheckBox {
             id: wordsetBox
-            checked: wordset
-            text: qsTr("Use external large word image set")
+            checked: DownloadManager.isDataRegistered("words")
+            text: enabled ? qsTr("Use full word image set") : qsTr("Download full word image set")
             visible: ApplicationInfo.isDownloadAllowed
+            enabled: !DownloadManager.isDataRegistered("words")
             onCheckedChanged: {
                 wordset = checked ? 'data2/words/words.rcc' : '';
             }
@@ -277,17 +278,14 @@ Item {
         Flow {
             spacing: 5
             width: parent.width
-            Slider {
+            GCSlider {
                 id: baseFontSizeSlider
                 width: 250 * ApplicationInfo.ratio
-                style: GCSliderStyle {}
                 maximumValue: ApplicationSettings.baseFontSizeMax
                 minimumValue: ApplicationSettings.baseFontSizeMin
-                stepSize: 1.0
-                tickmarksEnabled: true
-                updateValueWhileDragging: true
                 value: baseFontSize
                 onValueChanged: ApplicationSettings.baseFontSize = value;
+                scrollEnabled: false
             }
             GCText {
                 id: baseFontSizeText
@@ -315,17 +313,14 @@ Item {
         Flow {
             spacing: 5
             width: parent.width
-            Slider {
+            GCSlider {
                 id: fontLetterSpacingSlider
                 width: 250 * ApplicationInfo.ratio
-                style: GCSliderStyle {}
                 maximumValue: ApplicationSettings.fontLetterSpacingMax
                 minimumValue: ApplicationSettings.fontLetterSpacingMin
-                stepSize: 1.0
-                tickmarksEnabled: true
-                updateValueWhileDragging: true
                 value: fontLetterSpacing
-                onValueChanged: ApplicationSettings.fontLetterSpacing = value
+                onValueChanged: ApplicationSettings.fontLetterSpacing = value;
+                scrollEnabled: false
             }
             GCText {
                 id: fontLetterSpacingText
@@ -556,7 +551,8 @@ Item {
         sectionVisibleBox.checked = sectionVisible
 
         wordset = ApplicationSettings.wordset
-        wordsetBox.checked = (wordset != '')
+        wordsetBox.checked = DownloadManager.isDataRegistered("words") || ApplicationSettings.wordset == 'data2/words/words.rcc'
+        wordsetBox.enabled = !DownloadManager.isDataRegistered("words")
 
         baseFontSize = ApplicationSettings.baseFontSize;
         fontLetterSpacing = ApplicationSettings.fontLetterSpacing;
@@ -604,7 +600,7 @@ Item {
 
         if (ApplicationSettings.locale != dialogConfig.languages[languageBox.currentIndex].locale) {
             ApplicationSettings.locale = dialogConfig.languages[languageBox.currentIndex].locale
-            if(!DownloadManager.isDataRegistered(
+            if(ApplicationInfo.isDownloadAllowed && !DownloadManager.isDataRegistered(
                         "voices-" + ApplicationInfo.CompressedAudio + "/" +
                         ApplicationInfo.getVoicesLocale(dialogConfig.languages[languageBox.currentIndex].locale)
                         ))
@@ -621,9 +617,44 @@ Item {
                 qsTr("No"), null,
                 null
                 );
-            } else // check for updates or/and register new voices
-            DownloadManager.updateResource(
-            DownloadManager.getVoicesResourceForLocale(ApplicationSettings.locale))
+            } else {
+                // check for updates or/and register new voices
+                DownloadManager.updateResource(
+                            DownloadManager.getVoicesResourceForLocale(ApplicationSettings.locale))
+            }
+        }
+        // download words.rcc if needed
+        if(ApplicationSettings.wordset != "") {
+            // we want to use the external dataset, it is either in
+            // words/words.rcc or full-${CA}.rcc
+            if(DownloadManager.isDataRegistered("words")) {
+                // we either have it, we try to update in the background
+                // or we are downloading it
+                if(DownloadManager.haveLocalResource(wordset))
+                    DownloadManager.updateResource(wordset)
+            }
+            else {
+                // download automatically if automatic download else ask for download
+                if(isAutomaticDownloadsEnabled) {
+                    var prevAutomaticDownload = ApplicationSettings.isAutomaticDownloadsEnabled
+                    ApplicationSettings.isAutomaticDownloadsEnabled = true;
+                    DownloadManager.updateResource(wordset);
+                    ApplicationSettings.isAutomaticDownloadsEnabled = prevAutomaticDownload
+                }
+                else {
+                    Core.showMessageDialog(main,
+                    qsTr("The images for several activities are not yet installed. ")
+                    + qsTr("Do you want to download them now?"),
+                    qsTr("Yes"),
+                    function() {
+                        if (DownloadManager.downloadResource(wordset))
+                        var downloadDialog = Core.showDownloadDialog(pageView.currentItem, {});
+                    },
+                    qsTr("No"), function() { ApplicationSettings.wordset = '' },
+                    null
+                    );
+                }
+            }
         }
     }
 
@@ -638,11 +669,18 @@ Item {
             excludedFonts.push("ding");
             excludedFonts.push("symbol");
 
+            // first display fonts from rcc
+            for(var i = 0 ; i < rccFonts.length ; ++ i) {
+                // Append fonts from resources
+                fonts.append({ "text": rccFonts[i], "isLocalResource": true });
+            }
+
             for(var i = 0 ; i < systemFonts.length ; ++ i) {
                 var isExcluded = false;
+                var systemFont = systemFonts[i].toLowerCase();
                 // Remove symbol fonts
                 for(var j = 0 ; j < excludedFonts.length ; ++ j) {
-                    if(systemFonts[i].toLowerCase().indexOf(excludedFonts[j].toLowerCase()) != -1) {
+                    if(systemFont.indexOf(excludedFonts[j].toLowerCase()) != -1) {
                         isExcluded = true;
                         break;
                     }
@@ -650,7 +688,7 @@ Item {
 
                 // Remove fonts from rcc (if you have a default font from rcc, Qt will add it to systemFonts)
                 for(var j = 0 ; j < rccFonts.length ; ++ j) {
-                    if(rccFonts[j].toLowerCase().indexOf(systemFonts[i].toLowerCase()) != -1) {
+                    if(rccFonts[j].toLowerCase().indexOf(systemFont) != -1) {
                         isExcluded = true;
                         break;
                     }
@@ -661,14 +699,10 @@ Item {
                     fonts.append({ "text": systemFonts[i], "isLocalResource": false });
                 }
             }
-            for(var i = 0 ; i < rccFonts.length ; ++ i) {
-                // Append fonts from resources
-                fonts.append({ "text": rccFonts[i], "isLocalResource": true });
-            }
         }
     }
 
-    property variant fontCapitalizationModel: [
+    property var fontCapitalizationModel: [
         { text: qsTr("Mixed case (default)"), value: Font.MixedCase },
         { text: qsTr("All uppercase"), value: Font.AllUppercase },
         { text: qsTr("All lowercase"), value: Font.AllLowercase }
@@ -692,7 +726,6 @@ Item {
         (ApplicationSettings.showLockedActivities != showLockedActivities)
         );
     }
-
 }
 
     

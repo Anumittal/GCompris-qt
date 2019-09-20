@@ -3,8 +3,8 @@
  * Copyright (C) 2015 Bruno Coudoin <bruno.coudoin@gcompris.net>
  *
  * Authors:
- *   <THE GTK VERSION AUTHOR> (GTK+ version)
- *   YOUR NAME <YOUR EMAIL> (Qt Quick port)
+ *   Bruno Coudoin <bruno.coudoin@gcompris.net> (GTK+ version)
+ *   Bruno Coudoin <bruno.coudoin@gcompris.net> (Qt Quick port)
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -17,11 +17,11 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
-import QtQuick 2.1
+import QtQuick 2.6
 import GCompris 1.0
-import QtQuick.Controls 1.0
+import QtQuick.Controls 1.5
 
 import "../../core"
 
@@ -41,39 +41,89 @@ ActivityBase {
         Component.onCompleted: {
             activity.start.connect(start)
         }
-        onStart: edit.forceActiveFocus();
+        onStart: {
+            keyboard.populate();
+            edit.forceActiveFocus();
+        }
+
+        property bool horizontalMode: height <= width
+
+        GCCreationHandler {
+            id: creationHandler
+            onFileLoaded: {
+                edit.clear()
+                edit.text = data["text"]
+                edit.cursorPosition = edit.length
+            }
+            onClose: edit.forceActiveFocus()
+        }
 
         Column {
             id: controls
-            width: 200 * ApplicationInfo.ratio
+            width: 120 * ApplicationInfo.ratio
             anchors {
                 right: parent.right
                 top: parent.top
-                bottom: bar.top
                 margins: 10
             }
             spacing: 10
 
             Button {
-                style: GCButtonStyle {}
-                height: 30 * ApplicationInfo.ratio
-                width: parent.width
+                style: GCButtonStyle { textSize: "title"}
                 text: qsTr("Title")
+                width: parent.width
                 onClicked: edit.formatLineWith('h2')
             }
             Button {
-                style: GCButtonStyle {}
-                height: 30 * ApplicationInfo.ratio
-                width: parent.width
+                style: GCButtonStyle { textSize: "subtitle"}
                 text: qsTr("Subtitle")
+                width: parent.width
                 onClicked: edit.formatLineWith('h3')
             }
             Button {
-                style: GCButtonStyle {}
-                height: 30 * ApplicationInfo.ratio
+                style: GCButtonStyle { textSize: "regular"}
                 width: parent.width
                 text: qsTr("Paragraph")
                 onClicked: edit.formatLineWith('p')
+            }
+        }
+
+        Column {
+            id: saveAndLoadButtons
+            width: controls.width
+
+            property bool isEnoughSpace: {
+                if(ApplicationInfo.isMobile && parent.horizontalMode)
+                    return false
+                return (parent.height - keyboard.height - controls.height) > 2.5 * loadButton.height
+            }
+
+            anchors {
+                right: !isEnoughSpace ? controls.left : parent.right
+                top: !isEnoughSpace ? parent.top : controls.bottom
+                margins: 10
+            }
+            spacing: 10
+
+            Button {
+                id: loadButton
+                style: GCButtonStyle { textSize: "regular"}
+                width: parent.width
+                text: qsTr("Load")
+                onClicked: {
+                    creationHandler.loadWindow()
+                }
+            }
+            Button {
+                id: saveButton
+                style: GCButtonStyle { textSize: "regular"}
+                width: parent.width
+                text: qsTr("Save")
+                onClicked: {
+                    var textToSave = {}
+                    textToSave["text"] = edit.getFormattedText(0, edit.length)
+                    creationHandler.saveWindow(textToSave)
+                }
             }
         }
 
@@ -82,7 +132,7 @@ ActivityBase {
 
             anchors {
                 left: parent.left
-                right: controls.left
+                right: saveAndLoadButtons.left
                 top: parent.top
                 bottom: bar.top
                 margins: 10
@@ -112,6 +162,7 @@ ActivityBase {
                 wrapMode: TextEdit.Wrap
                 onCursorRectangleChanged: flick.ensureVisible(cursorRectangle)
                 textFormat: TextEdit.RichText
+                color: "#373737"
                 font {
                     pointSize: (18 + ApplicationSettings.baseFontSize) * ApplicationInfo.fontRatio
                     capitalization: ApplicationSettings.fontCapitalization
@@ -126,7 +177,7 @@ ActivityBase {
                     // height should be set automatically as mention in cursorRectangle property
                     // documentation but it does not work
                     height: parent.cursorRectangle.height
-                    color: 'red'
+                    color: '#DF543D'
                     SequentialAnimation on opacity {
                         running: true
                         loops: Animation.Infinite
@@ -148,6 +199,9 @@ ActivityBase {
                         moveCursorSelection(cursorPosition - 1, TextEdit.SelectCharacters)
                         cut()
                     }
+                }
+                function newline() {
+                    insert(cursorPosition, "<br></br>")
                 }
                 function formatLineWith(tag) {
                     var text = getText(0, length)
@@ -191,14 +245,21 @@ ActivityBase {
             anchors.bottom: parent.bottom
             anchors.horizontalCenter: parent.horizontalCenter
             width: parent.width
+            visible: ApplicationSettings.isVirtualKeyboard && !ApplicationInfo.isMobile
             onKeypress: {
                 if(text == backspace)
                     edit.backspace()
+                else if(text == newline)
+                    edit.newline()
                 else
                     edit.insertText(text)
             }
+            shiftKey: true
             onError: console.log("VirtualKeyboard error: " + msg);
-            layout: [
+            readonly property string newline: "\u21B2"
+
+            function populate() {
+                layout = [
                 [
                     { label: "0" },
                     { label: "1" },
@@ -243,9 +304,12 @@ ActivityBase {
                     { label: "Y" },
                     { label: "Z" },
                     { label: " " },
-                    { label: backspace }
+                    { label: backspace },
+                    { label: newline }
                 ]
             ]
+            }
+
         }
 
     }

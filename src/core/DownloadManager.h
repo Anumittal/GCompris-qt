@@ -16,7 +16,7 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #ifndef DOWNLOADMANAGER_H
@@ -50,7 +50,7 @@
  *
  * will be downloaded to a local path
  *
- * <tt>/\<QStandardPaths::writableLocation(QStandardPaths::DataLocation)\>/\<path/to/my/resource.rcc\></tt>
+ * <tt>/\<ApplicationSettings::getInstance()->cachePath()\>/\<path/to/my/resource.rcc\></tt>
  *
  * and registered with a resource root path
  *
@@ -76,7 +76,8 @@
  * isDataRegistered.
  *
  * @sa DownloadDialog, ApplicationSettings.downloadServerUrl,
- *     ApplicationSettings.isAutomaticDownloadsEnabled
+ *     ApplicationSettings.isAutomaticDownloadsEnabled,
+ *     ApplicationSettings.cachePath
  */
 class DownloadManager : public QObject
 {
@@ -96,7 +97,7 @@ private:
         QMap<QString,QString> contents;  ///< checksum map for download verification
         QList<QUrl> knownContentsUrls;   ///< store already tried upstream Contents files (for infinite loop protection)
 
-        DownloadJob(QUrl u = QUrl()) : url(u), file(), reply(0),
+        DownloadJob(const QUrl &u = QUrl()) : url(u), file(), reply(0),
                 queue(QList<QUrl>()) {}
     } DownloadJob;
 
@@ -115,10 +116,10 @@ private:
     /**
      * Get the platform-specific path storing downloaded resources.
      *
-     * Uses QStandardPaths::writableLocation(QStandardPaths::DataLocation)
+     * Uses QStandardPaths::writableLocation(QStandardPaths::CacheLocation)
      * which returns
-     *   - on desktop $HOME/.local/share/KDE/gcompris-qt/
-     *   - on android /data/data/net.gcompris/files
+     *   - on desktop linux $HOME/.cache/KDE/gcompris-qt/
+     *   - on other platforms check <http://doc.qt.io/qt-5/qstandardpaths.html>
      *
      * @return An absolute path.
      */
@@ -130,12 +131,13 @@ private:
      * @returns A list of absolute paths used for storing local resources.
      *          The caller should keep the returned list order when looking for
      *          resources, for now the lists contains:
-     *          1. getSystemDownloadPath()
-     *          2. QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)/gcompris-qt
+     *          1. data folder in the application path
+     *          2. getSystemDownloadPath()
+     *          3. QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)/gcompris-qt
      *             which is
      *             - $HOME/.local/share/gcompris-qt (on linux desktop)
      *             - /storage/sdcard0/GCompris (on android)
-     *          3. [QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation)]/gcompris-qt
+     *          4. [QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation)]/gcompris-qt
      *             which is on GNU/Linux
      *             - $HOME/.local/share/KDE/gcompris-qt
      *             - $HOME/.local/share/gcompris-qt
@@ -169,6 +171,7 @@ private:
 
     bool checkDownloadRestriction() const;
     DownloadJob* getJobByReply(QNetworkReply *r);
+    DownloadJob* getJobByUrl_locked(const QUrl& url) const;
 
     /** Start a new download specified by the passed DownloadJob */
     bool download(DownloadJob* job);
@@ -189,7 +192,9 @@ private:
     void unregisterResource_locked(const QString& filename);
     bool isRegistered(const QString& filename) const;
 
+#if 0
     QStringList getLocalResources();
+#endif
 
 private slots:
 
@@ -219,9 +224,8 @@ public:
     /**
      * Registers DownloadManager singleton in the QML engine.
      */
-    static void init();
-    static QObject *systeminfoProvider(QQmlEngine *engine,
-            QJSEngine *scriptEngine);
+    static QObject *downloadManagerProvider(QQmlEngine *engine,
+                                            QJSEngine *scriptEngine);
     static DownloadManager* getInstance();
 
     /**
@@ -266,7 +270,7 @@ public:
      */
     Q_INVOKABLE bool areVoicesRegistered() const;
 
-    /*
+    /**
      * Registers a rcc resource file given by a relative resource path
      *
      * @param filename  Relative resource path.

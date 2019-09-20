@@ -16,9 +16,9 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
-import QtQuick 2.0
+import QtQuick 2.6
 import GCompris 1.0
 
 /**
@@ -86,6 +86,13 @@ Item {
                            { label: "b", shiftLabel: "B" },
                            { label: "n", shiftLabel: "N" },
                            { label: "m", shiftLabel: "M" } ]]
+
+
+    /**
+     * type:string
+     * Symbol that can be used for the space key.
+    */
+    readonly property string space: "\u2423"
 
     /**
      * type:string
@@ -217,7 +224,6 @@ Item {
     z: 9999
     width: parent.width
     height: visible ? priv.cHeight : 0
-    anchors.bottom: parent.bottom
     anchors.horizontalCenter: parent.horizontalCenter
 
     property int modifiers: Qt.NoModifier;  // currently active key modifiers, internal only
@@ -250,7 +256,8 @@ Item {
     }
 
     function populateKeyboard(a) {
-        activity.loading.start();
+        if(activity.activityInfo.name != "menu/Menu.qml")
+            activity.loading.start();
         // populate asynchronously in a worker thread:
         keyboardWorker.sendMessage({
                                        shiftKey: keyboard.shiftKey,
@@ -298,7 +305,7 @@ Item {
     }
 
     Rectangle {
-        id: background
+        id: keyboardBackground
 
         width: parent.width
         height: keyboard.height
@@ -382,7 +389,7 @@ Item {
                     } // Row
             } // Item
         } // ListView
-    } // background
+    } // keyboardBackground
 
     /// @endcond
 }

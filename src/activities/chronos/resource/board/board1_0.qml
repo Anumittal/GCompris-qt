@@ -17,40 +17,36 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
-import QtQuick 2.0
+import QtQuick 2.6
 
 QtObject {
    property string instruction: qsTr("Moonwalker")
-   property variant levels: [
-      {
-          "pixmapfile": "images/bg.jpg",
-          "type": "SHAPE_BACKGROUND_IMAGE"
-      },
+   property var levels: [
       {
           "pixmapfile": "images/4.png",
           "x": "0.7",
           "y": "0.7",
-          "soundFile": "sound/2.ogg"
+          "soundFile": "sound/2.$CA"
       },
       {
           "pixmapfile": "images/3.png",
           "x": "0.3",
           "y": "0.7",
-          "soundFile": "sound/3.ogg"
+          "soundFile": "sound/3.$CA"
       },
       {
           "pixmapfile": "images/2.png",
           "x": "0.7",
           "y": "0.25",
-          "soundFile": "sound/2.ogg"
+          "soundFile": "sound/2.$CA"
       },
       {
           "pixmapfile": "images/1.png",
           "x": "0.3",
           "y": "0.25",
-          "soundFile": "sound/1.ogg"
+          "soundFile": "sound/1.$CA"
       },
       {
 		  "text": qsTr("1"),

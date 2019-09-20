@@ -16,11 +16,13 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "ApplicationSettings.h"
 #include "ApplicationInfo.h"
+
+#include "DownloadManager.h"
 
 #include <qmath.h>
 #include <QUrl>
@@ -28,75 +30,83 @@
 #include <QGuiApplication>
 #include <QScreen>
 #include <QLocale>
-
-#include <QSettings>
-#include <QStandardPaths>
-#include <QDebug>
+#include <QRect>
 
 #include <QtQml>
 
-#define GC_DEFAULT_FONT "Andika-R.ttf"
+#define GC_DEFAULT_FONT QLatin1String("Andika-R.otf")
 #define GC_DEFAULT_FONT_CAPITALIZATION 0 // Font.MixedCase
 #define GC_DEFAULT_FONT_LETTER_SPACING 0
 
-static const QString GENERAL_GROUP_KEY = "General";
-static const QString ADMIN_GROUP_KEY = "Admin";
-static const QString INTERNAL_GROUP_KEY = "Internal";
-static const QString FAVORITE_GROUP_KEY = "Favorite";
+static const char *GENERAL_GROUP_KEY = "General";
+static const char *ADMIN_GROUP_KEY = "Admin";
+static const char *INTERNAL_GROUP_KEY = "Internal";
+static const char *FAVORITE_GROUP_KEY = "Favorite";
 
-static const QString FULLSCREEN_KEY = "fullscreen";
-static const QString SHOW_LOCKED_ACTIVITIES_KEY = "showLockedActivities";
-static const QString ENABLE_AUDIO_VOICES_KEY = "enableAudioVoices";
-static const QString ENABLE_AUDIO_EFFECTS_KEY = "enableAudioEffects";
-static const QString VIRTUALKEYBOARD_KEY = "virtualKeyboard";
-static const QString LOCALE_KEY = "locale";
-static const QString FONT_KEY = "font";
-static const QString IS_CURRENT_FONT_EMBEDDED = "isCurrentFontEmbedded";
-static const QString ENABLE_AUTOMATIC_DOWNLOADS = "enableAutomaticDownloads";
+static const char *FULLSCREEN_KEY = "fullscreen";
+static const char *PREVIOUS_HEIGHT_KEY = "previousHeight";
+static const char *PREVIOUS_WIDTH_KEY = "previousWidth";
+static const char *SHOW_LOCKED_ACTIVITIES_KEY = "showLockedActivities";
+static const char *ENABLE_AUDIO_VOICES_KEY = "enableAudioVoices";
+static const char *ENABLE_AUDIO_EFFECTS_KEY = "enableAudioEffects";
+static const char *VIRTUALKEYBOARD_KEY = "virtualKeyboard";
+static const char *LOCALE_KEY = "locale";
+static const char *FONT_KEY = "font";
+static const char *IS_CURRENT_FONT_EMBEDDED = "isCurrentFontEmbedded";
+static const char *ENABLE_AUTOMATIC_DOWNLOADS = "enableAutomaticDownloads";
 
-static const QString DOWNLOAD_SERVER_URL_KEY = "downloadServerUrl";
+static const char *DOWNLOAD_SERVER_URL_KEY = "downloadServerUrl";
+static const char *CACHE_PATH_KEY = "cachePath";
+static const char *USERDATA_PATH_KEY = "userDataPath";
+static const char *RENDERER_KEY = "renderer";
 
-static const QString EXE_COUNT_KEY = "exeCount";
-static const QString LAST_GC_VERSION_RAN = "lastGCVersionRan";
+static const char *EXE_COUNT_KEY = "exeCount";
+static const char *LAST_GC_VERSION_RAN = "lastGCVersionRan";
 
-static const QString FILTER_LEVEL_MIN = "filterLevelMin";
-static const QString FILTER_LEVEL_MAX = "filterLevelMax";
+static const char *FILTER_LEVEL_MIN = "filterLevelMin";
+static const char *FILTER_LEVEL_MAX = "filterLevelMax";
 
-static const QString BASE_FONT_SIZE_KEY = "baseFontSize";
-static const QString FONT_CAPITALIZATION = "fontCapitalization";
-static const QString FONT_LETTER_SPACING = "fontLetterSpacing";
+static const char *BASE_FONT_SIZE_KEY = "baseFontSize";
+static const char *FONT_CAPITALIZATION = "fontCapitalization";
+static const char *FONT_LETTER_SPACING = "fontLetterSpacing";
 
-static const QString DEFAULT_CURSOR = "defaultCursor";
-static const QString NO_CURSOR = "noCursor";
-static const QString DEMO_KEY = "demo";
-static const QString CODE_KEY = "key";
-static const QString KIOSK_KEY = "kiosk";
-static const QString SECTION_VISIBLE = "sectionVisible";
-static const QString WORDSET = "wordset";
+static const char *DEFAULT_CURSOR = "defaultCursor";
+static const char *NO_CURSOR = "noCursor";
+static const char *DEMO_KEY = "demo";
+static const char *CODE_KEY = "key";
+static const char *KIOSK_KEY = "kiosk";
+static const char *SECTION_VISIBLE = "sectionVisible";
+static const char *WORDSET = "wordset";
 
-static const QString PROGRESS_KEY = "progress";
+static const char *PROGRESS_KEY = "progress";
 
-ApplicationSettings *ApplicationSettings::m_instance = NULL;
+static const char *DEFAULT_DOWNLOAD_SERVER = "https://cdn.kde.org/gcompris";
 
-ApplicationSettings::ApplicationSettings(QObject *parent): QObject(parent),
+ApplicationSettings *ApplicationSettings::m_instance = nullptr;
+
+ApplicationSettings::ApplicationSettings(const QString &configPath, QObject *parent): QObject(parent),
      m_baseFontSizeMin(-7), m_baseFontSizeMax(7),
      m_fontLetterSpacingMin(0.0), m_fontLetterSpacingMax(8.0),
-     m_config(QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) +
-              "/gcompris/" + GCOMPRIS_APPLICATION_NAME + ".conf", QSettings::IniFormat)
+     m_config(configPath, QSettings::IniFormat)
 {
+    const QRect &screenSize = QGuiApplication::screens().at(0)->availableGeometry();
     // initialize from settings file or default
 
     // general group
     m_config.beginGroup(GENERAL_GROUP_KEY);
     m_isAudioEffectsEnabled = m_config.value(ENABLE_AUDIO_EFFECTS_KEY, true).toBool();
     m_isFullscreen = m_config.value(FULLSCREEN_KEY, true).toBool();
-	m_isAudioVoicesEnabled = m_config.value(ENABLE_AUDIO_VOICES_KEY, true).toBool();
+    m_previousHeight = m_config.value(PREVIOUS_HEIGHT_KEY, screenSize.height()).toUInt();
+    m_previousWidth = m_config.value(PREVIOUS_WIDTH_KEY, screenSize.width()).toUInt();
+    m_isAudioVoicesEnabled = m_config.value(ENABLE_AUDIO_VOICES_KEY, true).toBool();
     m_isVirtualKeyboard = m_config.value(VIRTUALKEYBOARD_KEY,
             ApplicationInfo::getInstance()->isMobile()).toBool();
     m_locale = m_config.value(LOCALE_KEY, GC_DEFAULT_LOCALE).toString();
     m_font = m_config.value(FONT_KEY, GC_DEFAULT_FONT).toString();
+    if(m_font == QLatin1String("Andika-R.ttf"))
+        m_font = "Andika-R.otf";
     m_fontCapitalization = m_config.value(FONT_CAPITALIZATION, GC_DEFAULT_FONT_CAPITALIZATION).toUInt();
-    setFontLetterSpacing(m_config.value(FONT_LETTER_SPACING, GC_DEFAULT_FONT_LETTER_SPACING).toReal());
+    m_fontLetterSpacing = m_config.value(FONT_LETTER_SPACING, GC_DEFAULT_FONT_LETTER_SPACING).toReal();
     m_isEmbeddedFont = m_config.value(IS_CURRENT_FONT_EMBEDDED, true).toBool();
 
     // Init the activation mode
@@ -133,14 +143,20 @@ ApplicationSettings::ApplicationSettings(QObject *parent): QObject(parent),
     m_filterLevelMax = m_config.value(FILTER_LEVEL_MAX, 6).toUInt();
     m_defaultCursor = m_config.value(DEFAULT_CURSOR, false).toBool();
     m_noCursor = m_config.value(NO_CURSOR, false).toBool();
-    setBaseFontSize(m_config.value(BASE_FONT_SIZE_KEY, 0).toInt());
+    m_baseFontSize = m_config.value(BASE_FONT_SIZE_KEY, 0).toInt();
 
     m_config.sync();  // make sure all defaults are written back
     m_config.endGroup();
 
     // admin group
     m_config.beginGroup(ADMIN_GROUP_KEY);
-    m_downloadServerUrl = m_config.value(DOWNLOAD_SERVER_URL_KEY, "http://gcompris.net").toString();
+    m_downloadServerUrl = m_config.value(DOWNLOAD_SERVER_URL_KEY, QLatin1String(DEFAULT_DOWNLOAD_SERVER)).toString();
+    if(m_downloadServerUrl == "http://gcompris.net") {
+        setDownloadServerUrl(DEFAULT_DOWNLOAD_SERVER);
+    }
+    m_cachePath = m_config.value(CACHE_PATH_KEY, QStandardPaths::writableLocation(QStandardPaths::CacheLocation)).toString();
+    m_userDataPath = m_config.value(USERDATA_PATH_KEY, QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QLatin1String("/GCompris")).toString();
+    m_renderer = m_config.value(RENDERER_KEY, GRAPHICAL_RENDERER).toString();
     m_config.endGroup();
 
     // internal group
@@ -153,9 +169,11 @@ ApplicationSettings::ApplicationSettings(QObject *parent): QObject(parent),
     m_isBarHidden = false;
 
     connect(this, &ApplicationSettings::showLockedActivitiesChanged, this, &ApplicationSettings::notifyShowLockedActivitiesChanged);
-	connect(this, &ApplicationSettings::audioVoicesEnabledChanged, this, &ApplicationSettings::notifyAudioVoicesEnabledChanged);
-	connect(this, &ApplicationSettings::audioEffectsEnabledChanged, this, &ApplicationSettings::notifyAudioEffectsEnabledChanged);
-	connect(this, &ApplicationSettings::fullscreenChanged, this, &ApplicationSettings::notifyFullscreenChanged);
+    connect(this, &ApplicationSettings::audioVoicesEnabledChanged, this, &ApplicationSettings::notifyAudioVoicesEnabledChanged);
+    connect(this, &ApplicationSettings::audioEffectsEnabledChanged, this, &ApplicationSettings::notifyAudioEffectsEnabledChanged);
+    connect(this, &ApplicationSettings::fullscreenChanged, this, &ApplicationSettings::notifyFullscreenChanged);
+    connect(this, &ApplicationSettings::previousHeightChanged, this, &ApplicationSettings::notifyPreviousHeightChanged);
+    connect(this, &ApplicationSettings::previousWidthChanged, this, &ApplicationSettings::notifyPreviousWidthChanged);
     connect(this, &ApplicationSettings::localeChanged, this, &ApplicationSettings::notifyLocaleChanged);
     connect(this, &ApplicationSettings::fontChanged, this, &ApplicationSettings::notifyFontChanged);
     connect(this, &ApplicationSettings::virtualKeyboardChanged, this, &ApplicationSettings::notifyVirtualKeyboardChanged);
@@ -165,8 +183,12 @@ ApplicationSettings::ApplicationSettings(QObject *parent): QObject(parent),
     connect(this, &ApplicationSettings::sectionVisibleChanged, this, &ApplicationSettings::notifySectionVisibleChanged);
     connect(this, &ApplicationSettings::wordsetChanged, this, &ApplicationSettings::notifyWordsetChanged);
     connect(this, &ApplicationSettings::demoModeChanged, this, &ApplicationSettings::notifyDemoModeChanged);
+    connect(this, &ApplicationSettings::codeKeyChanged, this, &ApplicationSettings::notifyCodeKeyChanged);
     connect(this, &ApplicationSettings::kioskModeChanged, this, &ApplicationSettings::notifyKioskModeChanged);
     connect(this, &ApplicationSettings::downloadServerUrlChanged, this, &ApplicationSettings::notifyDownloadServerUrlChanged);
+    connect(this, &ApplicationSettings::cachePathChanged, this, &ApplicationSettings::notifyCachePathChanged);
+    connect(this, &ApplicationSettings::userDataPathChanged, this, &ApplicationSettings::notifyUserDataPathChanged);
+    connect(this, &ApplicationSettings::rendererChanged, this, &ApplicationSettings::notifyRendererChanged);
     connect(this, &ApplicationSettings::exeCountChanged, this, &ApplicationSettings::notifyExeCountChanged);
     connect(this, &ApplicationSettings::barHiddenChanged, this, &ApplicationSettings::notifyBarHiddenChanged);
     connect(this, &ApplicationSettings::lastGCVersionRanChanged, this, &ApplicationSettings::notifyLastGCVersionRanChanged);
@@ -183,6 +205,8 @@ ApplicationSettings::~ApplicationSettings()
     m_config.setValue(FONT_KEY, m_font);
     m_config.setValue(IS_CURRENT_FONT_EMBEDDED, m_isEmbeddedFont);
     m_config.setValue(FULLSCREEN_KEY, m_isFullscreen);
+    m_config.setValue(PREVIOUS_HEIGHT_KEY, m_previousHeight);
+    m_config.setValue(PREVIOUS_WIDTH_KEY, m_previousWidth);
     m_config.setValue(VIRTUALKEYBOARD_KEY, m_isVirtualKeyboard);
     m_config.setValue(ENABLE_AUTOMATIC_DOWNLOADS, m_isAutomaticDownloadsEnabled);
     m_config.setValue(FILTER_LEVEL_MIN, m_filterLevelMin);
@@ -202,6 +226,9 @@ ApplicationSettings::~ApplicationSettings()
     // admin group
     m_config.beginGroup(ADMIN_GROUP_KEY);
     m_config.setValue(DOWNLOAD_SERVER_URL_KEY, m_downloadServerUrl);
+    m_config.setValue(CACHE_PATH_KEY, m_cachePath);
+    m_config.setValue(USERDATA_PATH_KEY, m_userDataPath);
+    m_config.setValue(RENDERER_KEY, m_renderer);
     m_config.endGroup();
 
     // internal group
@@ -212,7 +239,7 @@ ApplicationSettings::~ApplicationSettings()
 
     m_config.sync();
 
-    m_instance = NULL;
+    m_instance = nullptr;
 }
 
 void ApplicationSettings::notifyShowLockedActivitiesChanged()
@@ -267,6 +294,18 @@ void ApplicationSettings::notifyFullscreenChanged()
 {
     updateValueInConfig(GENERAL_GROUP_KEY, FULLSCREEN_KEY, m_isFullscreen);
     qDebug() << "fullscreen set to: " << m_isFullscreen;
+}
+
+void ApplicationSettings::notifyPreviousHeightChanged()
+{
+    updateValueInConfig(GENERAL_GROUP_KEY, PREVIOUS_HEIGHT_KEY, m_previousHeight);
+    qDebug() << "previous height set to: " << m_previousHeight;
+}
+
+void ApplicationSettings::notifyPreviousWidthChanged()
+{
+    updateValueInConfig(GENERAL_GROUP_KEY, PREVIOUS_WIDTH_KEY, m_previousWidth);
+    qDebug() << "previous width set to: " << m_previousWidth;
 }
 
 void ApplicationSettings::notifyVirtualKeyboardChanged()
@@ -331,6 +370,14 @@ void ApplicationSettings::notifySectionVisibleChanged()
 
 void ApplicationSettings::notifyWordsetChanged()
 {
+    if(!m_wordset.isEmpty() &&
+       DownloadManager::getInstance()->haveLocalResource(m_wordset) &&
+       !DownloadManager::getInstance()->isDataRegistered("words")) {
+        // words.rcc is there -> register old file first
+        // then try to update in the background
+        DownloadManager::getInstance()->updateResource(m_wordset);
+    }
+
     updateValueInConfig(GENERAL_GROUP_KEY, WORDSET, m_wordset);
     qDebug() << "notifyWordset: " << m_wordset;
 }
@@ -339,6 +386,24 @@ void ApplicationSettings::notifyDownloadServerUrlChanged()
 {
     updateValueInConfig(ADMIN_GROUP_KEY, DOWNLOAD_SERVER_URL_KEY, m_downloadServerUrl);
     qDebug() << "downloadServerUrl set to: " << m_downloadServerUrl;
+}
+
+void ApplicationSettings::notifyCachePathChanged()
+{
+    updateValueInConfig(ADMIN_GROUP_KEY, CACHE_PATH_KEY, m_cachePath);
+    qDebug() << "cachePath set to: " << m_cachePath;
+}
+
+void ApplicationSettings::notifyUserDataPathChanged()
+{
+    updateValueInConfig(ADMIN_GROUP_KEY, USERDATA_PATH_KEY, m_userDataPath);
+    qDebug() << "userDataPath set to: " << m_userDataPath;
+}
+
+void ApplicationSettings::notifyRendererChanged()
+{
+    updateValueInConfig(ADMIN_GROUP_KEY, RENDERER_KEY, m_renderer);
+    qDebug() << "renderer set to: " << m_renderer;
 }
 
 void ApplicationSettings::notifyExeCountChanged()
@@ -379,7 +444,7 @@ QVariantMap ApplicationSettings::loadActivityConfiguration(const QString &activi
     m_config.beginGroup(activity);
     QStringList keys = m_config.childKeys();
     QVariantMap data;
-    foreach(const QString &key, keys) {
+    for(const QString &key : keys) {
         data[key] = m_config.value(key);
     }
     m_config.endGroup();
@@ -416,7 +481,6 @@ int ApplicationSettings::loadActivityProgress(const QString &activity)
     m_config.endGroup();
     qDebug() << "loaded progress for activity" << activity << ":" << progress;
     return progress;
-
 }
 
 void ApplicationSettings::saveActivityProgress(const QString &activity, int progress)
@@ -424,8 +488,14 @@ void ApplicationSettings::saveActivityProgress(const QString &activity, int prog
     updateValueInConfig(activity, PROGRESS_KEY, progress);
 }
 
-QObject *ApplicationSettings::systeminfoProvider(QQmlEngine *engine,
-                                                 QJSEngine *scriptEngine)
+
+bool ApplicationSettings::useExternalWordset()
+{
+    return !m_wordset.isEmpty() && DownloadManager::getInstance()->isDataRegistered("words");
+}
+
+QObject *ApplicationSettings::applicationSettingsProvider(QQmlEngine *engine,
+                                                          QJSEngine *scriptEngine)
 {
     Q_UNUSED(engine)
     Q_UNUSED(scriptEngine)
@@ -433,10 +503,3 @@ QObject *ApplicationSettings::systeminfoProvider(QQmlEngine *engine,
     ApplicationSettings* appSettings = getInstance();
     return appSettings;
 }
-
-void ApplicationSettings::init()
-{
-	qmlRegisterSingletonType<ApplicationSettings>("GCompris", 1, 0,
-												  "ApplicationSettings", systeminfoProvider);
-}
-

@@ -20,7 +20,7 @@
 ** Foundation and appearing in the file LICENSE.LGPL included in the
 ** packaging of this file.  Please review the following information to
 ** ensure the GNU Lesser General Public License version 2.1 requirements
-** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
+** will be met: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
 **
 ** In addition, as a special exception, Digia gives you certain additional
 ** rights.  These rights are described in the Digia Qt LGPL Exception
@@ -32,7 +32,7 @@
 ** Foundation and appearing in the file LICENSE.GPL included in the
 ** packaging of this file.  Please review the following information to
 ** ensure the GNU General Public License version 3.0 requirements will be
-** met: http://www.gnu.org/copyleft/gpl.html.
+** met: https://www.gnu.org/copyleft/gpl.html.
 **
 **
 ** $QT_END_LICENSE$
@@ -91,8 +91,9 @@ public class GComprisActivity extends QtActivity
     public void onCreate(Bundle savedInstanceState)
     {
         super.onCreate(savedInstanceState);
-
-        bindService(new Intent("com.android.vending.billing.InAppBillingService.BIND"),
+        Intent intent = new Intent("com.android.vending.billing.InAppBillingService.BIND");
+        intent.setPackage("com.android.vending");
+        bindService(intent,
                     m_serviceConnection, Context.BIND_AUTO_CREATE);
     }
 

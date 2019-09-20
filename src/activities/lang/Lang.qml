@@ -19,9 +19,9 @@
 *   GNU General Public License for more details.
 *
 *   You should have received a copy of the GNU General Public License
-*   along with this program; if not, see <http://www.gnu.org/licenses/>.
+*   along with this program; if not, see <https://www.gnu.org/licenses/>.
 */
-import QtQuick 2.1
+import QtQuick 2.6
 import GCompris 1.0
 import QtGraphicalEffects 1.0
 
@@ -40,9 +40,8 @@ ActivityBase {
         id: background
         source: "qrc:/gcompris/src/activities/lang/resource/imageid-bg.svg"
         fillMode: Image.PreserveAspectCrop
-        sourceSize.width: parent.width
+        sourceSize.width: Math.max(parent.width, parent.height)
 
-        readonly property string wordsResource: "data2/words/words.rcc"
         property bool englishFallback: false
 
         signal start
@@ -70,7 +69,7 @@ ActivityBase {
             property alias englishFallbackDialog: englishFallbackDialog
             property string locale: 'system'
             property alias dialogActivityConfig: dialogActivityConfig
-            property variant categoriesTranslations: activity.categoriesTranslations
+            property var categoriesTranslations: activity.categoriesTranslations
         }
 
         onStart: {
@@ -114,8 +113,7 @@ ActivityBase {
                 displayDialog(dialogHelp)
             }
             onHomeClicked: {
-                // if we don't have the images, we leave the activity on home()
-                if(DownloadManager.haveLocalResource(wordsResource) && !items.menuScreen.started && !items.imageReview.started)
+                if(!items.menuScreen.started && !items.imageReview.started)
                     // We're in a mini game, start imageReview
                     items.imageReview.start()
                 else if(items.imageReview.started)
@@ -143,7 +141,7 @@ ActivityBase {
             sourceComponent: GCDialog {
                 parent: activity.main
                 message: qsTr("We are sorry, we don't have yet a translation for your language.") + " " +
-                         qsTr("GCompris is developed by the KDE community, you can translate GCompris by joining a translation team on <a href=\"%2\">%2</a>").arg("http://l10n.kde.org/") +
+                         qsTr("GCompris is developed by the KDE community, you can translate GCompris by joining a translation team on <a href=\"%2\">%2</a>").arg("https://l10n.kde.org/") +
                          "<br /> <br />" +
                          qsTr("We switched to English for this activity but you can select another language in the configuration dialog.")
                 onClose: background.englishFallback = false
@@ -239,7 +237,8 @@ ActivityBase {
         }
     }
 
-    property variant categoriesTranslations: {"other": qsTr("other"),
+    property var categoriesTranslations: {"otherChapter": qsTr("other"),
+        "otherLesson": qsTr("other"),
         "action": qsTr("action"), "adjective": qsTr("adjective"),
         "color": qsTr("color"), "number": qsTr("number"),
         "people": qsTr("people"), "bodyparts": qsTr("bodyparts"),
@@ -250,6 +249,7 @@ ActivityBase {
         "vegetables": qsTr("vegetables"), "object": qsTr("object"),
         "construction": qsTr("construction"),
         "furniture": qsTr("furniture"), "houseware": qsTr("houseware"),
-        "tool": qsTr("tool"), "food": qsTr("food")}
+        "tool": qsTr("tool"), "food": qsTr("food"),
+        "transport": qsTr("transport")}
 
 }

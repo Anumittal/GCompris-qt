@@ -16,10 +16,10 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
-import QtQuick 2.2
-import QtQuick.Controls 1.0
+import QtQuick 2.6
+import QtQuick.Controls 1.5
 import GCompris 1.0
 
 Item {
@@ -44,13 +44,14 @@ Item {
             topMargin: 40
         }
         width: parent.width - cancelButton.width * 2
-        height: instructionTxt.height
+        height: Math.max(instructionTxt.height, lock.height) + 2*row.anchors.margins
         radius: 10
         border.width: 2
         border.color: "black"
         color: 'white'
 
         Row {
+            id: row
             anchors {
                 fill: parent
                 margins: 10
@@ -86,7 +87,8 @@ Item {
             }
             text: qsTr("Buy the full version").toUpperCase()
             style: GCButtonStyle {
-            }
+                 theme: "highContrast"
+           }
 
             onClicked: {
                 if(ApplicationSettings.isDemoMode)

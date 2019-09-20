@@ -17,9 +17,9 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
-import QtQuick 2.1
+import QtQuick 2.6
 import QtGraphicalEffects 1.0
 
 import "../../core"
@@ -35,7 +35,7 @@ ActivityBase {
         id: background
         anchors.fill: parent
         source: Activity.url + "background.svg"
-        sourceSize.width: parent.width
+        sourceSize.width: Math.max(parent.width, parent.height)
         fillMode: Image.PreserveAspectCrop
 
         signal start
@@ -52,7 +52,7 @@ ActivityBase {
         QtObject {
             id: items
             property Item main: activity.main
-            property GCAudio audioEffects: activity.audioEffects
+            property GCSfx audioEffects: activity.audioEffects
             property alias background: background
             property alias bar: bar
             property alias bonus: bonus
@@ -63,19 +63,23 @@ ActivityBase {
 
         onStart: { Activity.start(items) }
         onStop: { Activity.stop() }
+        
+        property int pieceSize: Math.round(blueFrame.width * 0.222)
 
         Image {
-            source: Activity.url + "goldframe.svg"
-            sourceSize.width: Math.min(background.width * 0.9,
-                                       background.height * 0.9)
+            id: blueFrame
+            source: Activity.url + "blueframe.svg"
+            sourceSize.width: Math.min(background.width,
+                                       background.height - bar.height) * 0.95
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
+            anchors.verticalCenterOffset: -bar.height * 0.55
         }
 
         Grid {
             id: puzzleArea
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.verticalCenter: parent.verticalCenter
+            anchors.horizontalCenter: blueFrame.horizontalCenter
+            anchors.verticalCenter: blueFrame.verticalCenter
             columns: 4
             spacing: 0
 
@@ -98,20 +102,19 @@ ActivityBase {
                 id: repeater
                 model: fifteenModel
                 delegate: Item {
-                    width: Math.min(background.width * 0.2,
-                                    background.height * 0.2)
-                    height: width
+                    width: pieceSize
+                    height: pieceSize
                     clip: true
                     property int val: value
 
                     Image {
                         id: image
                         source: value ? items.scene : ""
-                        sourceSize.width: parent.width * 4
+                        sourceSize.width: pieceSize * 4
                         fillMode: Image.Pad
                         transform: Translate {
-                            x: - image.width / 4 * ((value - 1) % 4)
-                            y: - image.width / 4 * Math.floor((value - 1) / 4)
+                            x: - pieceSize * ((value - 1) % 4)
+                            y: - pieceSize * Math.floor((value - 1) / 4)
                         }
                     }
 
@@ -121,6 +124,9 @@ ActivityBase {
                         anchors.verticalCenter: parent.verticalCenter
                         text: value && bar.level % 2 == 1 ? value : ""
                         fontSize: mediumSize
+                        color: "#ffe9f0fb"
+                        style: Text.Outline
+                        styleColor: "#ff1c4788"
                     }
 
                     DropShadow {
@@ -128,9 +134,9 @@ ActivityBase {
                         cached: false
                         horizontalOffset: 3
                         verticalOffset: 3
-                        radius: 8.0
+                        radius: 1
                         samples: 16
-                        color: "#80000000"
+                        color: "#ff1c4788"
                         source: text
                     }
                 }

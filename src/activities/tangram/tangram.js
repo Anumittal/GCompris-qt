@@ -1,10 +1,10 @@
 /* GCompris - tangram.js
  *
- * Copyright (C) 2015 YOUR NAME <xx@yy.org>
+ * Copyright (C) 2016 Bruno Coudoin <bruno.coudoin@gcompris.net>
  *
  * Authors:
- *   <THE GTK VERSION AUTHOR> (GTK+ version)
- *   "YOUR NAME" <YOUR EMAIL> (Qt Quick port)
+ *   Yves Combe / Philippe Banwarth (GTK+ version)
+ *   Bruno Coudoin <bruno.coudoin@gcompris.net> (Qt Quick port)
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -17,13 +17,10 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 .pragma library
-.import QtQuick 2.0 as Quick
-
-var url = "qrc:/gcompris/src/activities/tangram/resource/"
-
+.import QtQuick 2.6 as Quick
 
 var currentLevel = 0
 var items
@@ -157,23 +154,23 @@ function toDataset() {
 /* In edition mode arrow keys allow the move by 1 pixels in any direction */
 function processPressedKey(event) {
 
-    if ( items.editionMode && items.selectedITem && items.selectedITem.selected) {
+    if ( items.editionMode && items.selectedItem && items.selectedItem.selected) {
         /* Move the player */
         switch (event.key) {
         case Qt.Key_Right:
-            items.selectedITem.x += 1
+            items.selectedItem.x += 1
             event.accepted = true
             break
         case Qt.Key_Left:
-            items.selectedITem.x -= 1
+            items.selectedItem.x -= 1
             event.accepted = true
             break
         case Qt.Key_Up:
-            items.selectedITem.y -= 1
+            items.selectedItem.y -= 1
             event.accepted = true
             break
         case Qt.Key_Down:
-            items.selectedITem.y += 1
+            items.selectedItem.y += 1
             event.accepted = true
             break
         }

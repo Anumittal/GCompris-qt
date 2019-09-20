@@ -17,16 +17,15 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 /* ToDo / open issues:
  * - adjust wordlist filenames once we have an ApplicationInfo.dataPath() or so
- * - make uppercaseOnly be taken from (activity-) settings
  */
 
 .pragma library
-.import QtQuick 2.0 as Quick
+.import QtQuick 2.6 as Quick
 .import GCompris 1.0 as GCompris //for ApplicationInfo
 .import "qrc:/gcompris/src/core/core.js" as Core
 
@@ -37,6 +36,7 @@ var maxLevel = 0;
 var maxSubLevel = 0;
 var items;
 var uppercaseOnly;
+var speedSetting;
 var mode;
 
 //speed calculations, common:
@@ -66,12 +66,26 @@ var wordComponent = null;
 
 var successRate // Falling speed depends on it
 
-function start(items_, uppercaseOnly_,  _mode) {
+function start(items_, uppercaseOnly_,  _mode, speedSetting_) {
     items = items_;
     uppercaseOnly = uppercaseOnly_;
     mode = _mode;
+    speedSetting = speedSetting_;
     currentLevel = 0;
     currentSubLevel = 0;
+
+    incSpeed = 1 * speedSetting;
+    fallRateBase = 400 / speedSetting;
+    dropRateBase = 25000 / (speedSetting / 2);
+    
+    if (mode == "word") {
+        wgMaxFallSpeed = 70000 / speedSetting;
+        wgMaxSpeed = 1500 / speedSetting;
+        wgMinFallSpeed = 30000 / speedSetting;
+        wgMinSpeed = 500 / speedSetting;
+        wgDefaultFallSpeed = 80000 / speedSetting;
+        wgAddSpeed = 100 / (speedSetting / 2);
+    }
 
     var locale = items.locale == "system" ? "$LOCALE" : items.locale
 
@@ -238,11 +252,11 @@ function processKeyPress(text) {
 
 function setSpeed()
 {
-    if (mode == "letter") {
+    if (mode === "letter") {
         speed = (level.speed !== undefined) ? level.speed : (fallRateBase + Math.floor(fallRateMult / (currentLevel + 1)));
         fallSpeed = (level.fallspeed !== undefined) ? level.fallspeed : Math.floor((dropRateBase + (dropRateMult * (currentLevel + 1))));
     } else { // wordsgame
-        speed = (level.speed !== undefined) ? level.speed : wgDefaultSpeed - (currentLevel+1)*wgAddSpeed;
+        speed = (level.speed !== undefined) ? level.speed : wgDefaultSpeed - (currentLevel + 1)*wgAddSpeed;
         fallSpeed = (level.fallspeed !== undefined) ? level.fallspeed : wgDefaultFallSpeed - (currentLevel+1)*wgAddFallSpeed
 
         if(speed < wgMinSpeed ) speed = wgMinSpeed;
@@ -304,6 +318,7 @@ function createWord()
             word = wordComponent.createObject( items.background,
                 {
                     "text": text,
+                    "mode": items.ourActivity.getMode(),
                     "dominoValues": items.ourActivity.getDominoValues(text),
                     // assume x=width-25px for now, Word auto-adjusts onCompleted():
                     "x": Math.random() * (items.main.width - 25),
@@ -400,6 +415,7 @@ function nextSubLevel() {
         currentSubLevel = 0
         items.bonus.good("lion")
     } else
+        items.score.playWinAnimation();
         initSubLevel();
 }
 

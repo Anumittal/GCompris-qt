@@ -17,10 +17,12 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 .pragma library
-.import QtQuick 2.0 as Quick
+.import QtQuick 2.6 as Quick
+
+var url = "qrc:/gcompris/src/activities/simplepaint/resource/"
 
 var colorsSimple = [
             '#00FFFFFF',
@@ -86,7 +88,7 @@ var colorsAdvanced = [
             '#FFe9afdd',
             '#FFff2a7f',
             '#FFff80b2',
-            '#FFd35f8d',
+            '#FFd35f8d'
 ]
 
 var backgrounds = [

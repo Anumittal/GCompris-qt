@@ -17,11 +17,11 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 .pragma library
-.import QtQml 2.2 as Qt
 .import "qrc:/gcompris/src/core/core.js" as Core
+.import GCompris 1.0 as GCompris
 
 var url = "qrc:/gcompris/src/activities/money/resource/"
 
@@ -644,7 +644,11 @@ function initLevel() {
             price += cents
         }
 
-        var priceText = Number(price).toLocaleCurrencyString(Qt.locale())
+        var locale = GCompris.ApplicationSettings.locale
+        if(locale == "system") {
+            locale = Qt.locale().name == "C" ? "en_US" : Qt.locale().name
+        }
+        var priceText = Number(price).toLocaleCurrencyString(Qt.locale(locale))
         if(!centsMode) {
             // Strip floating part
             priceText = priceText.replace((/.00/), "")
@@ -691,7 +695,11 @@ function initLevel() {
         for(var i=0; i < tuxMoney.length; i++)
             tuxTotal += tuxMoney[i].val
 
-        var priceText = Number(tuxTotal).toLocaleCurrencyString(Qt.locale())
+        var locale = GCompris.ApplicationSettings.locale
+        if(locale == "system") {
+            locale = Qt.locale().name == "C" ? "en_US" : Qt.locale().name
+        }
+        var priceText = Number(tuxTotal).toLocaleCurrencyString(Qt.locale(locale))
         if(!centsMode) {
             // Strip floating part
             priceText = priceText.replace((/.00/), "")
@@ -703,6 +711,11 @@ function initLevel() {
                       .arg(priceText)
 
     }
+
+    //Keyboard reset
+    items.itemIndex = -1
+    items.selectedArea = items.pocket
+
 }
 
 // Given a price return a random object

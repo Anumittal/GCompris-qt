@@ -13,29 +13,43 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 .pragma library
-.import QtQuick 2.0 as Quick
+.import QtQuick 2.6 as Quick
 .import "qrc:/gcompris/src/core/core.js" as Core
 
 var currentLevel
 var coreItems
-var otheritems
+var otherItems
 var operand
 var secondOperandVal
 var firstOperandVal
 var operations = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+var OperandsEnum = {
+    TIMES_SIGN : "\u00D7",
+    PLUS_SIGN : "\u002B",
+    MINUS_SIGN : "\u2212",
+    DIVIDE_SIGN : "\u2215"
+}
 
-var nbLevel = 10
+var nbLevel = operations.length
 
 function start(coreItems_, otherItems_, operand_) {
     operand   = operand_
     coreItems = coreItems_
-    otheritems = otherItems_
+    otherItems = otherItems_
     currentLevel = 0
     coreItems.score.numberOfSubLevels = 10
+    // for multiplication and addition, the first levels will display
+    // currentLevel * N (N behind random)
+    // where the last levels will do:
+    // N * currentLevel
+    if(operand.text === OperandsEnum.TIMES_SIGN || operand.text === OperandsEnum.PLUS_SIGN)
+        nbLevel = 2 * operations.length
+    else
+        nbLevel = operations.length
     initLevel()
 }
 
@@ -50,14 +64,14 @@ function initLevel() {
     operations = Core.shuffle(operations)
     calculateOperands()
 
-    otheritems.iAmReady.visible = true
-    otheritems.firstOp.visible = false
-    otheritems.secondOp.visible = false
+    otherItems.iAmReady.visible = true
+    otherItems.firstOp.visible = false
+    otherItems.secondOp.visible = false
     coreItems.balloon.stopMoving()
 }
 
 function nextLevel() {
-    if( ++currentLevel >= nbLevel ) {
+    if(++currentLevel >= nbLevel) {
         currentLevel = 0
     }
     initLevel();
@@ -74,96 +88,84 @@ function calculateOperands()
 {
     switch(operand.text)
     {
-    case "x":
+    case OperandsEnum.TIMES_SIGN:
         firstOperandVal = coreItems.bar.level
         secondOperandVal = operations[coreItems.score.currentSubLevel - 1]
         break;
-    case "+":
+    case OperandsEnum.PLUS_SIGN:
         firstOperandVal = coreItems.bar.level
         secondOperandVal = operations[coreItems.score.currentSubLevel - 1]
         break;
-    case "-":
+    case OperandsEnum.MINUS_SIGN:
         firstOperandVal = coreItems.bar.level + 9
         secondOperandVal = operations[coreItems.score.currentSubLevel - 1]
         break;
-    case "/":
+    case OperandsEnum.DIVIDE_SIGN:
         firstOperandVal = coreItems.bar.level * operations[coreItems.score.currentSubLevel - 1]
         secondOperandVal = coreItems.bar.level
         break;
     }
 
-    otheritems.firstOp.text = firstOperandVal
-    otheritems.secondOp.text = secondOperandVal
+    if(currentLevel < operations.length) {
+        otherItems.firstOp.text = firstOperandVal
+        otherItems.secondOp.text = secondOperandVal
+    } else {
+        otherItems.firstOp.text = secondOperandVal
+        // Don't forget to remove the first operations.length levels
+        firstOperandVal -= operations.length
+        otherItems.secondOp.text = firstOperandVal
+    }
 }
 
 // Return the expected answer
 function getAnswer() {
     switch(operand.text)
     {
-    case "x":
+    case OperandsEnum.TIMES_SIGN:
         return (firstOperandVal * secondOperandVal)
 
-    case "+":
+    case OperandsEnum.PLUS_SIGN:
         return (firstOperandVal + secondOperandVal)
 
-    case "-":
+    case OperandsEnum.MINUS_SIGN:
         return (firstOperandVal - secondOperandVal)
     
-    case "/":
+    case OperandsEnum.DIVIDE_SIGN:
         return (firstOperandVal / secondOperandVal)
     }
 }
 
 function validateAnswer(screenAnswer)
 {
-    switch(operand.text)
-    {
-    case "x":
-        return (getAnswer() === screenAnswer)
-
-    case "+":
-        return (getAnswer() === screenAnswer)
-
-    case "-":
-        return (getAnswer() === screenAnswer)
-        
-    case "/":
-        return (getAnswer() === screenAnswer)
-    }
+    return (getAnswer() === screenAnswer)
 }
 
 function run() {
     calculateOperands()
-    otheritems.numpad.resetText()
+    otherItems.numpad.resetText()
     coreItems.score.visible = true
-    otheritems.iAmReady.visible = false
-    otheritems.firstOp.visible = true
-    otheritems.secondOp.visible = true
-    otheritems.numpad.answerFlag = false
-    otheritems.result = getAnswer()
+    otherItems.iAmReady.visible = false
+    otherItems.firstOp.visible = true
+    otherItems.secondOp.visible = true
+    otherItems.numpad.answerFlag = false
+    otherItems.result = getAnswer()
 
     // TODO adjusting or disabling the difficulty
     coreItems.balloon.startMoving(20000)
 }
 
 function questionsLeft() {
-    if(validateAnswer(parseInt(otheritems.numpad.answer))) {
-        otheritems.numpad.answerFlag = true
+    if(validateAnswer(parseInt(otherItems.numpad.answer))) {
+        otherItems.numpad.answerFlag = true
 
-        if(coreItems.score.currentSubLevel < 10) {
+        if(coreItems.score.currentSubLevel < coreItems.score.numberOfSubLevels) {
             coreItems.audioEffects.play("qrc:/gcompris/src/core/resource/sounds/win.wav")
             coreItems.score.currentSubLevel++
             coreItems.timer.start()
-        } else if(coreItems.score.currentSubLevel >= 10) {
+        } else {
             coreItems.score.currentSubLevel = 1
             coreItems.balloon.stopMoving()
             coreItems.bonus.good("smiley");
         }
     }
-}
-
-function shuffle(o) {
-    for(var j, x, i = o.length; i;
-        j = Math.floor(Math.random() * i), x = o[--i], o[i] = o[j], o[j] = x);
-    return o;
 }

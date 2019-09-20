@@ -17,14 +17,14 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
-import QtQuick 2.1
+import QtQuick 2.6
 
 import "../memory"
 import "dataset.js" as Dataset
 
 MemoryCommon {
     dataset: Dataset.get()
-    backgroundImg: "qrc:/gcompris/src/activities/memory-wordnumber/resource/NewHouseNoText.svg"
+    backgroundImg: "qrc:/gcompris/src/activities/memory-wordnumber/resource/background.svg"
 }

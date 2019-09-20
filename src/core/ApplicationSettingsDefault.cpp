@@ -16,7 +16,7 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "ApplicationSettings.h"
@@ -32,18 +32,18 @@ void ApplicationSettings::checkPayment() {
         setDemoMode(checkActivationCode(m_codeKey) < 2);
 }
 
-uint ApplicationSettings::checkActivationCode(const QString code) {
+uint ApplicationSettings::checkActivationCode(const QString &code) {
     if(code.length() != 12) {
         return 0;
     }
     bool ok;
-    uint year = code.mid(4, 3).toUInt(&ok, 16);
-    uint month = code.mid(7, 1).toUInt(&ok, 16);
-    uint crc = code.mid(8, 4).toUInt(&ok, 16);
+    uint year = code.midRef(4, 3).toUInt(&ok, 16);
+    uint month = code.midRef(7, 1).toUInt(&ok, 16);
+    uint crc = code.midRef(8, 4).toUInt(&ok, 16);
 
     uint expectedCrc =
-            code.mid(0, 4).toUInt(&ok, 16) ^
-            code.mid(4, 4).toUInt(&ok, 16) ^
+            code.midRef(0, 4).toUInt(&ok, 16) ^
+            code.midRef(4, 4).toUInt(&ok, 16) ^
             0xCECA;
 
     ok = (expectedCrc == crc && year < 2100 && month <= 12);
@@ -52,7 +52,7 @@ uint ApplicationSettings::checkActivationCode(const QString code) {
         return 0;
 
     // Check date is under 2 years
-    ok = year * 100 + month + 200 >= atoi(BUILD_DATE);
+    ok = int(year * 100 + month + 200) >= atoi(BUILD_DATE);
     return(ok ? 2 : 1);
 }
 

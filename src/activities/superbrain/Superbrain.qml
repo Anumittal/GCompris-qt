@@ -17,9 +17,9 @@
  *   GNU General Public License for more details.
  *
  *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
-import QtQuick 2.1
+import QtQuick 2.6
 
 import "../../core"
 import "superbrain.js" as Activity
@@ -34,12 +34,12 @@ ActivityBase {
     pageComponent: Image {
         id: background
         source: Activity.baseUrl + "background.svg"
-        sourceSize.width: parent.width
+        sourceSize.width: Math.max(parent.width, parent.height)
         fillMode: Image.PreserveAspectCrop
         focus: true
 
         readonly property double scaleFactor: 1
-        readonly property bool isPortrait: (height > width)
+        readonly property bool isPortrait: (height >= width)
 
         signal start
         signal stop

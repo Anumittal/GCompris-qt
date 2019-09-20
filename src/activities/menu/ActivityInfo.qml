@@ -13,17 +13,22 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, see <http://www.gnu.org/licenses/>.
+ * along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 import GCompris 1.0
 
 ActivityInfo {
   name: "menu/Menu.qml"
   difficulty: 0
+  //: Activity title
   title: qsTr("GCompris Main Menu")
+  //: Help title
   description: qsTr("Select an activity to run it.")
-  goal: qsTr("GCompris is a high quality educational software suite comprising of numerous activities for children aged 2 to 10.")
+  //: Help goal
+  goal: qsTr("GCompris is a high quality educational software suite, including a large number of activities for children aged 2 to 10.")
+  //: Help prerequisite
   prerequisite: qsTr("Some of the activities are game orientated, but nonetheless still educational.")
+  //: Help manual
   manual: qsTr("Select an icon to enter an activity or to display a list of activities in a category.
 At the bottom of the screen is the GCompris control bar. Notice that you can hide or show the bar by touching its anchor.
 The following icons are displayed:
@@ -43,7 +48,9 @@ Shortcuts:
     Ctrl+B Show or Hide the control bar
     Ctrl+F Toggle full screen
     Ctrl+M Toggle mute for the background music
-    Ctrl+S Toggle the activity section bar" )
+    Ctrl+S Toggle the activity section bar
+    " )
   credit: ""
   section: "/"
+  createdInVersion: 0
 }
